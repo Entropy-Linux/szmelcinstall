@@ -1,176 +1,94 @@
 {
-  "groups": {
-    "configs": {
-      "include": [
-        ".zshrc",
-        ".bashrc",
-        ".profile",
-        ".zprofile",
-        ".zshenv",
-        ".config/**",
-        ".local/bin/**",
-        ".local/share/applications/**",
-        ".local/share/fonts/**",
-        ".local/share/icons/**",
-        ".local/share/themes/**",
-        ".themes/**",
-        ".icons/**",
-        ".face"
-      ],
-      "exclude": [
-        ".cache/**",
-        ".local/state/**",
-        ".local/share/zinit/**",
-        ".local/share/Trash/**",
-        ".local/share/recently-used*",
-        ".local/share/gvfs-metadata/**",
-        ".local/share/flatpak/**",
-        ".local/share/containers/**",
-        ".local/share/keyrings/**",
-        ".zcompdump*",
-        ".dbus/**",
-        ".Xauthority",
-        ".ICEauthority",
-        ".config/pulse/**",
-        ".config/chromium/**",
-        ".config/google-chrome/**",
-        ".config/BraveSoftware/**",
-        ".mozilla/**",
-        ".pki/**",
-        "/run/**",
-        "/tmp/**",
-        "/etc/machine-id",
-        "/var/lib/dbus/machine-id",
-        "/var/lib/systemd/random-seed",
-        "/var/lib/NetworkManager/**",
-        "/var/lib/pacman/local/**"
-      ],
-      "packages": [
-        "grml-zsh-config",
-        "screen"
-      ]
-    },
-    "desktop": {
-      "include": [
-        ".config/gtk-3.0/**",
-        ".config/gtk-4.0/**",
-        ".config/hypr/**",
-        ".config/waybar/**",
-        ".config/sway/**",
-        ".config/xfce4/**",
-        ".config/i3/**",
-        ".config/awesome/**",
-        ".config/openbox/**",
-        ".config/qt5ct/**",
-        ".config/qt6ct/**",
-        ".config/alacritty/**",
-        ".config/kitty/**",
-        ".config/dunst/**",
-        ".config/picom/**",
-        ".config/polybar/**",
-        ".local/share/icons/**",
-        ".local/share/themes/**",
-        ".local/share/fonts/**",
-        ".themes/**",
-        ".icons/**"
-      ],
-      "exclude": [
-        ".cache/**",
-        ".local/state/**",
-        ".local/share/zinit/**",
-        ".local/share/Trash/**",
-        ".local/share/recently-used*",
-        ".local/share/gvfs-metadata/**",
-        ".zcompdump*",
-        ".dbus/**",
-        ".Xauthority",
-        ".ICEauthority",
-        "/run/**",
-        "/tmp/**",
-        "/etc/machine-id",
-        "/var/lib/dbus/machine-id",
-        "/var/lib/systemd/random-seed",
-        "/var/lib/NetworkManager/**",
-        "/var/lib/pacman/local/**"
-      ],
-      "packages": [
-        "kitty",
-        "alacritty",
-        "hyprland",
-        "waybar",
-        "sway"
-      ]
-    },
-    "cache": {
-      "include": [
-        "*"
-      ],
-      "exclude": [
-        ".local/share/zinit/**",
-        ".local/share/Trash/**",
-        ".local/share/recently-used*",
-        ".local/share/gvfs-metadata/**",
-        ".zcompdump*",
-        ".dbus/**",
-        ".Xauthority",
-        ".ICEauthority",
-        "/run/**",
-        "/tmp/**",
-        "/etc/machine-id",
-        "/var/lib/dbus/machine-id",
-        "/var/lib/systemd/random-seed",
-        "/var/lib/NetworkManager/**",
-        "/var/lib/pacman/local/**"
-      ],
-      "packages": [
-        "chromium",
-        "google-chrome",
-        "brave",
-        "firefox",
-        "pulse",
-        "flatpak"
-      ]
-    }
+  "root_home": {
+    "include": [
+      ".zshrc",
+      ".bashrc",
+      ".profile",
+      ".zprofile",
+      ".zshenv",
+      ".config/**",
+      ".local/bin/**",
+      ".local/share/applications/**",
+      ".local/share/fonts/**",
+      ".local/share/icons/**",
+      ".local/share/themes/**",
+      ".themes/**",
+      ".icons/**",
+      ".face"
+    ],
+    "exclude": [
+      ".cache/**",
+      ".local/state/**",
+      ".local/share/zinit/**",
+      ".local/share/Trash/**",
+      ".local/share/recently-used*",
+      ".local/share/gvfs-metadata/**",
+      ".local/share/flatpak/**",
+      ".local/share/containers/**",
+      ".local/share/keyrings/**",
+      ".zcompdump*",
+      ".dbus/**",
+      ".Xauthority",
+      ".ICEauthority",
+      ".config/pulse/**",
+      ".config/chromium/**",
+      ".config/google-chrome/**",
+      ".config/BraveSoftware/**",
+      ".mozilla/**",
+      ".pki/**",
+      "/run/**",
+      "/tmp/**",
+      "/etc/machine-id",
+      "/var/lib/dbus/machine-id",
+      "/var/lib/systemd/random-seed",
+      "/var/lib/NetworkManager/**",
+      "/var/lib/pacman/local/**"
+    ]
   },
-  "packages": {
-    "grml-zsh-config": [
-      ".zshrc"
+  "user_home": {
+    "include": [
+      ".zshrc",
+      ".bashrc",
+      ".profile",
+      ".zprofile",
+      ".zshenv",
+      ".config/**",
+      ".local/bin/**",
+      ".local/share/applications/**",
+      ".local/share/fonts/**",
+      ".local/share/icons/**",
+      ".local/share/themes/**",
+      ".themes/**",
+      ".icons/**",
+      ".face"
     ],
-    "screen": [
-      ".screenrc"
-    ],
-    "kitty": [
-      ".config/kitty/**"
-    ],
-    "alacritty": [
-      ".config/alacritty/**"
-    ],
-    "hyprland": [
-      ".config/hypr/**"
-    ],
-    "waybar": [
-      ".config/waybar/**"
-    ],
-    "sway": [
-      ".config/sway/**"
-    ],
-    "chromium": [
-      ".config/chromium/**"
-    ],
-    "google-chrome": [
-      ".config/google-chrome/**"
-    ],
-    "brave": [
-      ".config/BraveSoftware/**"
-    ],
-    "firefox": [
-      ".mozilla/**"
-    ],
-    "pulse": [
-      ".config/pulse/**"
-    ],
-    "flatpak": [
-      ".local/share/flatpak/**"
+    "exclude": [
+      ".cache/**",
+      ".local/state/**",
+      ".local/share/zinit/**",
+      ".local/share/Trash/**",
+      ".local/share/recently-used*",
+      ".local/share/gvfs-metadata/**",
+      ".local/share/flatpak/**",
+      ".local/share/containers/**",
+      ".local/share/keyrings/**",
+      ".zcompdump*",
+      ".dbus/**",
+      ".Xauthority",
+      ".ICEauthority",
+      ".config/pulse/**",
+      ".config/chromium/**",
+      ".config/google-chrome/**",
+      ".config/BraveSoftware/**",
+      ".mozilla/**",
+      ".pki/**",
+      "/run/**",
+      "/tmp/**",
+      "/etc/machine-id",
+      "/var/lib/dbus/machine-id",
+      "/var/lib/systemd/random-seed",
+      "/var/lib/NetworkManager/**",
+      "/var/lib/pacman/local/**"
     ]
   },
   "extra_paths": [

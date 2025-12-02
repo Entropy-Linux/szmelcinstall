@@ -14,67 +14,61 @@ def _toggle_bool(current: bool | None) -> bool:
 	return not current
 
 
-class IsoInstallSubMenu(AbstractSubMenu[None]):
-	def __init__(self, config: ArchConfig):
-		self._config = config
-		items = [
-			MenuItem(
-				text=tr('Configs'),
-				value=config.iso_copy_configs,
-				action=_toggle_bool,
-				preview_action=lambda item: tr('Enabled') if item.value else tr('Disabled'),
-				key='iso_copy_configs',
-			),
-			MenuItem(
-				text=tr('Desktop'),
-				value=config.iso_copy_desktop,
-				action=_toggle_bool,
-				preview_action=lambda item: tr('Enabled') if item.value else tr('Disabled'),
-				key='iso_copy_desktop',
-			),
-			MenuItem(
-				text=tr('Session Cache'),
-				value=config.iso_copy_cache,
-				action=_toggle_bool,
-				preview_action=lambda item: tr('Enabled') if item.value else tr('Disabled'),
-				key='iso_copy_cache',
-			),
-		]
-
-		group = MenuItemGroup(items, checkmarks=True)
-		super().__init__(group, config=config)
-
-
 class EntropyTweaksMenu(AbstractSubMenu[None]):
+	INSTALL_FROM_ISO_MODES = {
+		'configs': tr('Configs'),
+		'configs_cache': tr('Configs + Live Cache'),
+	}
+
 	def __init__(self, config: ArchConfig):
 		self._config = config
 
-		def _open_iso_submenu(current: bool | None) -> bool:
-			if not self._config.install_from_iso_enabled:
-				self._config.install_from_iso_enabled = True
-			IsoInstallSubMenu(self._config).run()
-			return self._config.install_from_iso_enabled
+		def _select_install_from_iso_mode(current: str | None) -> str | None:
+			current_mode = self._config.install_from_iso_mode or 'configs'
+			options = [
+				MenuItem(tr('Disabled'), value='off'),
+				MenuItem(self.INSTALL_FROM_ISO_MODES['configs'], value='configs'),
+				MenuItem(self.INSTALL_FROM_ISO_MODES['configs_cache'], value='configs_cache'),
+			]
+			group = MenuItemGroup(options, checkmarks=False)
+			group.set_focus_by_value('configs' if not self._config.install_from_iso else current_mode)
+
+			result = SelectMenu[str](
+				group,
+				header=tr('Install from ISO mode'),
+				alignment=Alignment.CENTER,
+				columns=1,
+				orientation=Orientation.VERTICAL,
+				search_enabled=False,
+				allow_skip=False,
+			).run()
+
+			if result.type_ != ResultType.Selection:
+				return current
+
+			choice = result.item().value
+			if choice == 'off':
+				self._config.install_from_iso = False
+				return current_mode
+
+			self._config.install_from_iso = True
+			self._config.install_from_iso_mode = choice
+			return choice
 
 		def _preview_install_from_iso(item: MenuItem) -> str:
-			if not self._config.install_from_iso_enabled:
+			if not self._config.install_from_iso:
 				return tr('Disabled')
 
-			parts = []
-			if self._config.iso_copy_configs:
-				parts.append(tr('Configs'))
-			if self._config.iso_copy_desktop:
-				parts.append(tr('Desktop'))
-			if self._config.iso_copy_cache:
-				parts.append(tr('Session Cache'))
-			return ', '.join(parts) if parts else tr('Enabled')
+			mode = item.value or 'configs'
+			return self.INSTALL_FROM_ISO_MODES.get(mode, tr('Configs'))
 
 		items = [
 			MenuItem(
 				text=tr('Install from ISO'),
-				value=config.install_from_iso_enabled,
-				action=_open_iso_submenu,
+				value=config.install_from_iso_mode,
+				action=_select_install_from_iso_mode,
 				preview_action=_preview_install_from_iso,
-				key='install_from_iso_enabled',
+				key='install_from_iso_mode',
 			),
 			MenuItem(
 				text=tr('Custom script (custom.sh)'),

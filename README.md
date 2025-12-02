@@ -1,6 +1,6 @@
 # SzmelcInstall
 > ### *Archinstall fork for Entropy Linux*
-> ## Version: 12.2
+> ## Version: 11
 
 ---
 
@@ -21,9 +21,9 @@
 ---
 
 # Features (what you get)
-- Install-from-ISO is now one toggle with a submenu of checkboxes: **Configs**, **Desktop**, **Session Cache** (defaults: Configs+Desktop on, Session Cache off). Unified config lives in `config/install_from_iso.json` with per-group includes/excludes and package-to-path mappings; `/etc/skel` is always copied and the live ISO package set is reapplied to the target.
-- Entropy Tweaks: Install-from-ISO selector and Szmelc AUR repo toggle (Optional/TrustAll, `packages.szmelc.com`).
-- Custom script hook (toggle in Entropy Tweaks): runs `custom.sh` stages before/after major steps. Edit `archinstall/custom.sh`; commented or missing stages are skipped.
+- Install-from-ISO with two modes: **Configs** (safe, curated includes/excludes) or **Configs + Live Cache** (bring almost everything from the live session). Configs live in `config/install_from_iso.json` and `config/install_from_iso_cache.json`. Both modes copy dotfiles, themes/icons/fonts, `/etc/skel`, and reinstall the live ISO package set while skipping machine IDs and other bad state.
+- Entropy Tweaks: Install-from-ISO mode selector and Szmelc AUR repo toggle (Optional/TrustAll, `packages.szmelc.com`).
+- Custom script hook (toggle in Entropy Tweaks): runs `custom.sh` stages before/after major steps. Edit `archinstall/custom.sh` to add per-stage commands; missing or commented stages are skipped.
 - Arch Tweaks: yay (from Chaotic AUR via pacman) and Chaotic AUR repo setup with interactive retry/force/skip/stop.
 - Pacstrap conflict/missing handlers (remove/choose/force/skip, manual rename, strip version) with confirmation prompts.
 - TUI niceties: Entropy-branded header, Ctrl+h help, Ctrl+i info (`INFO.md`), Entropy/Arch Tweaks pinned to the top.
@@ -34,7 +34,7 @@
 1) Boot the Entropy live ISO, run `sudo python -m archinstall`.
 2) Configure language, disks, profile, network, users, etc.
 3) Open **Entropy Tweaks**:
-   - **Install from ISO**: Space toggles enable/disable; Enter opens the submenu. Check **Configs** (dotfiles, skel, core configs), **Desktop** (WM/DE configs, themes/icons/fonts), **Session Cache** (browser/app caches; still skips machine IDs and system state). Edit `config/install_from_iso.json` to adjust includes/excludes or package mappings.
+   - **Install from ISO**: pick **Configs** (default) or **Configs + Live Cache**; pick **Disabled** to skip. Edit the JSON files if you want different include/exclude lists.
    - **Szmelc AUR**: leave on to add the repo automatically.
    - **Custom script**: enable to run `custom.sh` stages. Each stage (1–10) corresponds to before/after initialization, user config, pre-install, installation, and post-install. Commands run with `stage` env set to the stage name.
 4) Open **Arch Tweaks**:
@@ -48,7 +48,7 @@
 ---
 
 # Tips
-- Enable **Session Cache** if you want browser/app caches and most live-session state; it still skips machine IDs, NetworkManager state, pacman local DB, and known problematic profiles.
-- Tune `config/install_from_iso.json` to add/remove paths or map packages to paths. Excludes are globbed recursively.
+- Use **Configs + Live Cache** if you want browser caches and most live-session state; it still skips machine IDs, NetworkManager state, pacman local DB, and known problematic profiles.
+- Tune the JSON configs to add/remove paths. Excludes are globbed recursively.
 - Ctrl+h/Ctrl+i popups stay until Esc; put your own info in `INFO.md`.
 - If any step fails (pacstrap/repos), prompts let you retry, force, skip, or stop with a clear “Chosen: … Continue? Y/n” confirmation.

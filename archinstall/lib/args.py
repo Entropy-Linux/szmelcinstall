@@ -76,10 +76,8 @@ class ArchConfig:
 	timezone: str = 'UTC'
 	services: list[str] = field(default_factory=list)
 	custom_commands: list[str] = field(default_factory=list)
-	install_from_iso_enabled: bool = False
-	iso_copy_configs: bool = True
-	iso_copy_desktop: bool = True
-	iso_copy_cache: bool = False
+	install_from_iso: bool = False
+	install_from_iso_mode: str = 'configs'
 	custom_script: bool = False
 	szmelc_aur: bool = True
 	install_yay: bool = True
@@ -118,10 +116,8 @@ class ArchConfig:
 			'timezone': self.timezone,
 			'services': self.services,
 			'custom_commands': self.custom_commands,
-			'install_from_iso_enabled': self.install_from_iso_enabled,
-			'iso_copy_configs': self.iso_copy_configs,
-			'iso_copy_desktop': self.iso_copy_desktop,
-			'iso_copy_cache': self.iso_copy_cache,
+			'install_from_iso': self.install_from_iso,
+			'install_from_iso_mode': self.install_from_iso_mode,
 			'custom_script': self.custom_script,
 			'szmelc_aur': self.szmelc_aur,
 			'install_yay': self.install_yay,
@@ -237,14 +233,10 @@ class ArchConfig:
 		if services := args_config.get('services', []):
 			arch_config.services = services
 
-		if 'install_from_iso_enabled' in args_config:
-			arch_config.install_from_iso_enabled = bool(args_config['install_from_iso_enabled'])
-		if 'iso_copy_configs' in args_config:
-			arch_config.iso_copy_configs = bool(args_config['iso_copy_configs'])
-		if 'iso_copy_desktop' in args_config:
-			arch_config.iso_copy_desktop = bool(args_config['iso_copy_desktop'])
-		if 'iso_copy_cache' in args_config:
-			arch_config.iso_copy_cache = bool(args_config['iso_copy_cache'])
+		if 'install_from_iso' in args_config:
+			arch_config.install_from_iso = bool(args_config['install_from_iso'])
+		if 'install_from_iso_mode' in args_config:
+			arch_config.install_from_iso_mode = str(args_config['install_from_iso_mode'])
 		if 'custom_script' in args_config:
 			arch_config.custom_script = bool(args_config['custom_script'])
 
