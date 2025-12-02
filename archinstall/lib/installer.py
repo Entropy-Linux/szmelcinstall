@@ -774,8 +774,14 @@ class Installer:
 		return users[0]
 
 	def _resolve_live_user_home(self) -> Path | None:
-		env_user = os.environ.get('SUDO_USER') or os.environ.get('USER') or os.environ.get('LOGNAME')
 		home_parent = Path('/home')
+		preferred_users = ['entropy', 'liveuser', 'arch']
+		env_user = os.environ.get('SUDO_USER') or os.environ.get('USER') or os.environ.get('LOGNAME')
+
+		for name in preferred_users:
+			candidate = home_parent / name
+			if candidate.exists():
+				return candidate
 
 		if env_user and env_user != 'root':
 			candidate = home_parent / env_user
