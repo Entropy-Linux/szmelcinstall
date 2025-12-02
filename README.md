@@ -4,6 +4,22 @@
 
 ---
 
+# Screenshots
+> ### **Main TUI layout**
+> <img width="329" height="403" alt="image" src="https://github.com/user-attachments/assets/4a7d14e7-fba5-4cd4-91b7-2f9416413a78" />
+> 
+> ---
+> ### **"Install from ISO" types**
+> <img width="199" height="99" alt="image" src="https://github.com/user-attachments/assets/2339e4c5-c65c-4348-8119-f393ccafd97e" />
+> 
+> ---
+> ### **Extended Error Handling**
+> <img width="475" height="250" alt="image" src="https://github.com/user-attachments/assets/742a5323-1aa5-45d5-8e62-61f254ab0592" />
+> 
+> ---
+
+---
+
 # Features (what you get)
 - Install-from-ISO with two modes: **Configs** (safe, curated includes/excludes) or **Configs + Live Cache** (bring almost everything from the live session). Configs live in `config/install_from_iso.json` and `config/install_from_iso_cache.json`. Both modes copy dotfiles, themes/icons/fonts, `/etc/skel`, and reinstall the live ISO package set while skipping machine IDs and other bad state.
 - Entropy Tweaks: Install-from-ISO mode selector and Szmelc AUR repo toggle (Optional/TrustAll, `packages.szmelc.com`).
