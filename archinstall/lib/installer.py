@@ -1,4 +1,6 @@
+import fnmatch
 import glob
+import json
 import os
 import platform
 import re
@@ -788,30 +790,111 @@ class Installer:
 		home_dir = Path.home()
 		return home_dir if home_dir.exists() else None
 
-	def _copy_home_contents(self, source: Path, destination: Path, description: str) -> None:
+	def _should_exclude(self, rel_path: str, abs_path: Path, exclude_patterns: list[str]) -> bool:
+		for pattern in exclude_patterns:
+			if pattern.startswith('/'):
+				base_pat = pattern[:-3] if pattern.endswith('/**') else pattern
+				if fnmatch.fnmatch(str(abs_path), pattern) or str(abs_path).startswith(base_pat.rstrip('/') + '/'):
+					return True
+				continue
+
+			pat = pattern.lstrip('/')
+			if pat.endswith('/**'):
+				base_pat = pat[:-3]
+				if rel_path == base_pat or rel_path.startswith(base_pat.rstrip('/') + '/'):
+					return True
+			if fnmatch.fnmatch(rel_path, pat):
+				return True
+
+		return False
+
+	def _gather_home_paths(self, source: Path, include_patterns: list[str]) -> list[Path]:
+		paths: set[Path] = set()
+
+		for pattern in include_patterns:
+			if pattern.startswith('/'):
+				abs_path = Path(pattern)
+				if abs_path.exists() and abs_path.is_relative_to(source):
+					paths.add(abs_path)
+				continue
+
+			pat = pattern.lstrip('./')
+			for match in source.glob(pat):
+				try:
+					match.relative_to(source)
+				except ValueError:
+					continue
+				paths.add(match)
+
+		sorted_paths = sorted(paths, key=lambda p: (len(p.as_posix().split('/')), p.as_posix()))
+
+		minimized: list[Path] = []
+		for path in sorted_paths:
+			if any(parent in path.parents for parent in minimized):
+				continue
+			minimized.append(path)
+
+		return minimized
+
+	def _copy_home_contents(
+		self,
+		source: Path,
+		destination: Path,
+		description: str,
+		include: list[str] | None = None,
+		exclude: list[str] | None = None,
+	) -> None:
 		if not source.exists():
 			debug(f'{description}: source path {source} not found, skipping')
 			return
 
+		include_patterns = include or ['*']
+		exclude_patterns = exclude or []
+
 		info(f'{description}: copying from {source} to {destination}')
 		destination.mkdir(parents=True, exist_ok=True)
 
-		for entry in source.iterdir():
-			target = destination / entry.name
+		def ignore_func(base: Path) -> Callable[[str, list[str]], list[str]]:
+			def _ignore(dir_path: str, names: list[str]) -> list[str]:
+				ignored: list[str] = []
+				for name in names:
+					full = Path(dir_path) / name
+					try:
+						rel = full.relative_to(base).as_posix()
+					except ValueError:
+						continue
+					if self._should_exclude(rel, full, exclude_patterns):
+						ignored.append(name)
+				return ignored
+
+			return _ignore
+
+		for match in self._gather_home_paths(source, include_patterns):
 			try:
-				if entry.is_dir() and not entry.is_symlink():
-					shutil.copytree(entry, target, symlinks=True, dirs_exist_ok=True)
+				rel = match.relative_to(source).as_posix()
+			except ValueError:
+				continue
+
+			if self._should_exclude(rel, match, exclude_patterns):
+				debug(f'{description}: skipping {match} (excluded)')
+				continue
+
+			target = destination / rel
+			try:
+				if match.is_dir() and not match.is_symlink():
+					shutil.copytree(match, target, symlinks=True, dirs_exist_ok=True, ignore=ignore_func(source))
 				else:
+					target.parent.mkdir(parents=True, exist_ok=True)
 					if target.exists() and target.is_dir() and not target.is_symlink():
 						shutil.rmtree(target)
-					shutil.copy2(entry, target, follow_symlinks=False)
+					shutil.copy2(match, target, follow_symlinks=False)
 			except Exception as err:
-				warn(f'Unable to copy {entry} to {target}: {err}')
+				warn(f'Unable to copy {match} to {target}: {err}')
 
-	def copy_root_home(self) -> None:
-		self._copy_home_contents(Path('/root'), self.target / 'root', 'Syncing root home')
+	def copy_root_home(self, include: list[str] | None = None, exclude: list[str] | None = None) -> None:
+		self._copy_home_contents(Path('/root'), self.target / 'root', 'Syncing root home', include, exclude)
 
-	def copy_live_user_home(self, users: list[User]) -> None:
+	def copy_live_user_home(self, users: list[User], include: list[str] | None = None, exclude: list[str] | None = None) -> None:
 		if not users:
 			debug('No users configured, skipping live user home sync')
 			return
@@ -826,7 +909,7 @@ class Installer:
 			return
 
 		target_home = self.target / 'home' / primary_user.username
-		self._copy_home_contents(source_home, target_home, f'Copying live home to /home/{primary_user.username}')
+		self._copy_home_contents(source_home, target_home, f'Copying live home to /home/{primary_user.username}', include, exclude)
 
 		try:
 			self.arch_chroot(f'chown -R {primary_user.username}:{primary_user.username} /home/{primary_user.username}')
@@ -876,9 +959,137 @@ class Installer:
 		return sorted_packages
 
 	def apply_install_from_iso(self, users: list[User]) -> None:
-		self.copy_root_home()
-		self.copy_live_user_home(users)
+		cfg = self._load_install_from_iso_config()
+		root_cfg = cfg.get('root_home', {})
+		user_cfg = cfg.get('user_home', {})
+
+		self.copy_root_home(
+			include=root_cfg.get('include', ['*']),
+			exclude=root_cfg.get('exclude', []),
+		)
+		self.copy_live_user_home(
+			users,
+			include=user_cfg.get('include', ['*']),
+			exclude=user_cfg.get('exclude', []),
+		)
+		self._copy_extra_paths(cfg.get('extra_paths', []))
 		self.add_live_iso_packages()
+
+	def _copy_extra_paths(self, entries: list[dict[str, str]]) -> None:
+		for entry in entries:
+			source = Path(entry.get('source', ''))
+			destination = entry.get('destination', '')
+
+			if not source or not destination:
+				continue
+
+			if not source.exists():
+				debug(f'Extra path {source} missing, skipping')
+				continue
+
+			dest_path = Path(destination)
+			if dest_path.is_absolute():
+				dest_path = self.target / dest_path.relative_to('/')
+			else:
+				dest_path = self.target / dest_path
+
+			info(f'Copying extra path {source} to {dest_path}')
+			try:
+				if source.is_dir() and not source.is_symlink():
+					shutil.copytree(source, dest_path, symlinks=True, dirs_exist_ok=True)
+				else:
+					dest_path.parent.mkdir(parents=True, exist_ok=True)
+					shutil.copy2(source, dest_path, follow_symlinks=False)
+			except Exception as err:
+				warn(f'Unable to copy extra path {source} to {dest_path}: {err}')
+
+	def _install_from_iso_config_path(self) -> Path:
+		return Path(__file__).resolve().parent.parent / 'config' / 'install_from_iso.json'
+
+	def _load_install_from_iso_config(self) -> dict[str, Any]:
+		default = {
+			'root_home': {
+				'include': [
+					'.zshrc',
+					'.bashrc',
+					'.profile',
+					'.zprofile',
+					'.zshenv',
+					'.config/**',
+					'.local/bin/**',
+					'.local/share/applications/**',
+					'.themes/**',
+					'.icons/**',
+				],
+				'exclude': [
+					'.cache/**',
+					'.local/state/**',
+					'.local/share/zinit/**',
+					'.zcompdump*',
+					'.dbus/**',
+					'.Xauthority',
+					'.ICEauthority',
+					'.config/pulse/**',
+					'/run/**',
+					'/tmp/**',
+					'/etc/machine-id',
+					'/var/lib/dbus/machine-id',
+					'/var/lib/systemd/random-seed',
+					'/var/lib/NetworkManager/**',
+					'/var/lib/pacman/local/**',
+				],
+			},
+			'user_home': {
+				'include': [
+					'.zshrc',
+					'.bashrc',
+					'.profile',
+					'.zprofile',
+					'.zshenv',
+					'.config/**',
+					'.local/bin/**',
+					'.local/share/applications/**',
+					'.themes/**',
+					'.icons/**',
+				],
+				'exclude': [
+					'.cache/**',
+					'.local/state/**',
+					'.local/share/zinit/**',
+					'.zcompdump*',
+					'.dbus/**',
+					'.Xauthority',
+					'.ICEauthority',
+					'.config/pulse/**',
+					'/run/**',
+					'/tmp/**',
+					'/etc/machine-id',
+					'/var/lib/dbus/machine-id',
+					'/var/lib/systemd/random-seed',
+					'/var/lib/NetworkManager/**',
+					'/var/lib/pacman/local/**',
+				],
+			},
+			'extra_paths': [{'source': '/etc/skel', 'destination': '/etc/skel'}],
+		}
+
+		if hasattr(self, '_install_from_iso_config_cache'):
+			return self._install_from_iso_config_cache  # type: ignore[attr-defined]
+
+		path = self._install_from_iso_config_path()
+
+		if not path.exists():
+			self._install_from_iso_config_cache = default  # type: ignore[attr-defined]
+			return default
+
+		try:
+			cfg = json.loads(path.read_text())
+			self._install_from_iso_config_cache = cfg  # type: ignore[attr-defined]
+			return cfg
+		except Exception as err:
+			warn(f'Failed to read install_from_iso config, using defaults: {err}')
+			self._install_from_iso_config_cache = default  # type: ignore[attr-defined]
+			return default
 
 	def _confirm_step(self, choice_key: str, actions: str) -> bool:
 		resp = input(f'Chosen: {choice_key}. {actions}. Continue? (Y/n): ').strip().lower()

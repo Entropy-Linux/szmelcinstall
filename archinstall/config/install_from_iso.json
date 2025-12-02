@@ -1,0 +1,70 @@
+{
+  "root_home": {
+    "include": [
+      ".zshrc",
+      ".bashrc",
+      ".profile",
+      ".zprofile",
+      ".zshenv",
+      ".config/**",
+      ".local/bin/**",
+      ".local/share/applications/**",
+      ".themes/**",
+      ".icons/**"
+    ],
+    "exclude": [
+      ".cache/**",
+      ".local/state/**",
+      ".local/share/zinit/**",
+      ".zcompdump*",
+      ".dbus/**",
+      ".Xauthority",
+      ".ICEauthority",
+      ".config/pulse/**",
+      "/run/**",
+      "/tmp/**",
+      "/etc/machine-id",
+      "/var/lib/dbus/machine-id",
+      "/var/lib/systemd/random-seed",
+      "/var/lib/NetworkManager/**",
+      "/var/lib/pacman/local/**"
+    ]
+  },
+  "user_home": {
+    "include": [
+      ".zshrc",
+      ".bashrc",
+      ".profile",
+      ".zprofile",
+      ".zshenv",
+      ".config/**",
+      ".local/bin/**",
+      ".local/share/applications/**",
+      ".themes/**",
+      ".icons/**"
+    ],
+    "exclude": [
+      ".cache/**",
+      ".local/state/**",
+      ".local/share/zinit/**",
+      ".zcompdump*",
+      ".dbus/**",
+      ".Xauthority",
+      ".ICEauthority",
+      ".config/pulse/**",
+      "/run/**",
+      "/tmp/**",
+      "/etc/machine-id",
+      "/var/lib/dbus/machine-id",
+      "/var/lib/systemd/random-seed",
+      "/var/lib/NetworkManager/**",
+      "/var/lib/pacman/local/**"
+    ]
+  },
+  "extra_paths": [
+    {
+      "source": "/etc/skel",
+      "destination": "/etc/skel"
+    }
+  ]
+}
