@@ -23,6 +23,8 @@ from archinstall.lib.packages.packages import check_package_upgrade
 from archinstall.lib.profile.profiles_handler import profile_handler
 from archinstall.lib.translationhandler import tr
 from archinstall.tui import Tui
+import re
+import subprocess
 
 
 def ask_user_questions() -> None:
@@ -68,6 +70,73 @@ def perform_installation(mountpoint: Path) -> None:
 	optional_repositories = config.mirror_config.optional_repositories if config.mirror_config else []
 	mountpoint = disk_config.mountpoint if disk_config.mountpoint else mountpoint
 
+	def run_custom_stage(stage: str) -> None:
+		if not getattr(config, 'custom_script', False):
+			return
+
+		path = Path(__file__).resolve().parent.parent / 'custom.sh'
+		if not path.exists():
+			return
+
+		stages = [
+			'before_initialization',
+			'after_initialization',
+			'before_user_config',
+			'after_user_config',
+			'before_pre_install',
+			'after_pre_install',
+			'before_installation',
+			'after_installation',
+			'before_post_install',
+			'after_post_install',
+		]
+
+		stage_map = {idx + 1: name for idx, name in enumerate(stages)}
+
+		def parse_script(script_path: Path) -> dict[str, list[str]]:
+			stage_cmds: dict[str, list[str]] = {name: [] for name in stages}
+			current_stage: str | None = None
+
+			for raw in script_path.read_text().splitlines():
+				line = raw.rstrip('\n')
+
+				if not line.strip():
+					continue
+
+				if line.startswith('#'):
+					m = re.match(r'#\s*(\d+)\b', line)
+					if m:
+						idx = int(m.group(1))
+						current_stage = stage_map.get(idx)
+					else:
+						continue
+					continue
+
+				if current_stage is None:
+					continue
+
+				stage_cmds[current_stage].append(line)
+
+			return stage_cmds
+
+		if stage not in stages:
+			return
+
+		cmds = parse_script(path).get(stage, [])
+		if not cmds:
+			return
+
+		script = '\n'.join(cmds)
+
+		env = os.environ.copy()
+		env['stage'] = stage
+
+		info(f'Running custom.sh for stage: {stage}')
+		try:
+			subprocess.run(['/bin/sh', '-c', script], check=True, env=env)
+		except subprocess.CalledProcessError as err:
+			raise RequirementError(f'custom.sh failed at stage {stage}: {err}') from err
+
 	if config.mirror_config is None:
 		config.mirror_config = MirrorConfiguration()
 
@@ -86,11 +155,14 @@ def perform_installation(mountpoint: Path) -> None:
 			repo for repo in config.mirror_config.custom_repositories if repo.name != 'szmelc'
 		]
 
+	run_custom_stage('before_initialization')
+
 	with Installer(
 		mountpoint,
 		disk_config,
 		kernels=config.kernels,
 	) as installation:
+		run_custom_stage('after_initialization')
 		# Mount all the drives to the desired mountpoint
 		if disk_config.config_type != DiskLayoutType.Pre_mount:
 			installation.mount_ordered_layout()
@@ -105,6 +177,8 @@ def perform_installation(mountpoint: Path) -> None:
 		if mirror_config := config.mirror_config:
 			installation.set_mirrors(mirror_config, on_target=False)
 
+		run_custom_stage('before_pre_install')
+
 		installation.minimal_installation(
 			optional_repositories=optional_repositories,
 			mkinitcpio=run_mkinitcpio,
@@ -114,6 +188,8 @@ def perform_installation(mountpoint: Path) -> None:
 
 		if mirror_config := config.mirror_config:
 			installation.set_mirrors(mirror_config, on_target=True)
+
+		run_custom_stage('after_pre_install')
 
 		if config.chaotic_aur:
 			installation.add_chaotic_aur()
@@ -137,14 +213,20 @@ def perform_installation(mountpoint: Path) -> None:
 				config.profile_config,
 			)
 
+		run_custom_stage('before_user_config')
+
 		if config.auth_config:
 			if config.auth_config.users:
 				installation.create_users(config.auth_config.users)
 				auth_handler.setup_auth(installation, config.auth_config, config.hostname)
 
+		run_custom_stage('after_user_config')
+
 		if config.install_from_iso:
 			users = config.auth_config.users if config.auth_config and config.auth_config.users else []
 			installation.apply_install_from_iso(users)
+
+		run_custom_stage('before_installation')
 
 		if config.install_yay and config.auth_config and config.auth_config.users:
 			installation.install_yay(config.auth_config.users)
@@ -174,10 +256,14 @@ def perform_installation(mountpoint: Path) -> None:
 		if (profile_config := config.profile_config) and profile_config.profile:
 			profile_config.profile.post_install(installation)
 
+		run_custom_stage('after_installation')
+
 		# If the user provided a list of services to be enabled, pass the list to the enable_service function.
 		# Note that while it's called enable_service, it can actually take a list of services and iterate it.
 		if servies := config.services:
 			installation.enable_service(servies)
+
+		run_custom_stage('before_post_install')
 
 		if disk_config.has_default_btrfs_vols():
 			btrfs_options = disk_config.btrfs_options
@@ -192,6 +278,8 @@ def perform_installation(mountpoint: Path) -> None:
 			run_custom_user_commands(cc, installation)
 
 		installation.genfstab()
+
+		run_custom_stage('after_post_install')
 
 		debug(f'Disk states after installing:\n{disk_layouts()}')
 

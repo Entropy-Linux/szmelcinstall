@@ -71,6 +71,13 @@ class EntropyTweaksMenu(AbstractSubMenu[None]):
 				key='install_from_iso_mode',
 			),
 			MenuItem(
+				text=tr('Custom script (custom.sh)'),
+				value=config.custom_script,
+				action=_toggle_bool,
+				preview_action=lambda item: tr('Enabled') if item.value else tr('Disabled'),
+				key='custom_script',
+			),
+			MenuItem(
 				text=tr('Szmelc AUR'),
 				value=config.szmelc_aur,
 				action=_toggle_bool,

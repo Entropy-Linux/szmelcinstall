@@ -308,6 +308,8 @@ class GlobalMenu(AbstractMenu[None]):
 			mode = getattr(self._arch_config, 'install_from_iso_mode', 'configs')
 			label = tr('Configs + Live Cache') if mode == 'configs_cache' else tr('Configs')
 			flags.append(f"{tr('Install from ISO')}: {label}")
+		if getattr(self._arch_config, 'custom_script', False):
+			flags.append(tr('Custom script'))
 		if self._arch_config.szmelc_aur:
 			flags.append('Szmelc AUR')
 		return ', '.join(flags) if flags else tr('No tweaks enabled')
