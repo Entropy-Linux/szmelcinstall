@@ -222,7 +222,7 @@ def perform_installation(mountpoint: Path) -> None:
 
 		run_custom_stage('after_user_config')
 
-		if config.install_from_iso:
+		if config.install_from_iso_enabled:
 			users = config.auth_config.users if config.auth_config and config.auth_config.users else []
 			installation.apply_install_from_iso(users)
 

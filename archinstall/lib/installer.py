@@ -965,26 +965,39 @@ class Installer:
 		return sorted_packages
 
 	def apply_install_from_iso(self, users: list[User]) -> None:
-		mode = getattr(arch_config_handler.config, 'install_from_iso_mode', 'configs') or 'configs'
-		cfg = self._load_install_from_iso_config(mode)
-		root_cfg = cfg.get('root_home', {})
-		user_cfg = cfg.get('user_home', {})
+		cfg = self._load_install_from_iso_config()
+		config = arch_config_handler.config
+		if not getattr(config, 'install_from_iso_enabled', False):
+			return
 
-		# Install packages from the live ISO first to avoid file conflicts with /etc/skel.
-		self.add_live_iso_packages()
+		selected_groups = []
+		if getattr(config, 'iso_copy_configs', False):
+			selected_groups.append('configs')
+		if getattr(config, 'iso_copy_desktop', False):
+			selected_groups.append('desktop')
+		if getattr(config, 'iso_copy_cache', False):
+			selected_groups.append('cache')
 
-		self._copy_extra_paths(cfg.get('extra_paths', []))
+		if not selected_groups:
+			debug('Install from ISO enabled but no groups selected, skipping home copy')
+		else:
+			merged = self._merge_iso_groups(cfg, selected_groups)
 
-		self.copy_root_home(
-			include=root_cfg.get('include', ['*']),
-			exclude=root_cfg.get('exclude', []),
-		)
-		self.copy_live_user_home(
-			users,
-			include=user_cfg.get('include', ['*']),
-			exclude=user_cfg.get('exclude', []),
-		)
-		self._populate_users_from_skel(users)
+			# Install packages from the live ISO first to avoid file conflicts with /etc/skel.
+			self.add_live_iso_packages()
+
+			self._copy_extra_paths(merged.get('extra_paths', []))
+
+			self.copy_root_home(
+				include=merged.get('include', ['*']),
+				exclude=merged.get('exclude', []),
+			)
+			self.copy_live_user_home(
+				users,
+				include=merged.get('include', ['*']),
+				exclude=merged.get('exclude', []),
+			)
+			self._populate_users_from_skel(users)
 
 	def _copy_extra_paths(self, entries: list[dict[str, str]]) -> None:
 		for entry in entries:
@@ -1055,162 +1068,211 @@ class Installer:
 			except SysCallError as err:
 				warn(f'Failed to update ownership after skel copy for {user.username}: {err}')
 
-	def _install_from_iso_config_path(self, mode: str) -> Path:
-		filename = 'install_from_iso_cache.json' if mode == 'configs_cache' else 'install_from_iso.json'
-		return Path(__file__).resolve().parent.parent / 'config' / filename
+	def _install_from_iso_config_path(self) -> Path:
+		return Path(__file__).resolve().parent.parent / 'config' / 'install_from_iso.json'
 
-	def _default_install_from_iso_config(self, mode: str) -> dict[str, Any]:
-		base = {
-			'root_home': {
-				'include': [
-					'.zshrc',
-					'.bashrc',
-					'.profile',
-					'.zprofile',
-					'.zshenv',
-					'.config/**',
-					'.local/bin/**',
-					'.local/share/applications/**',
-					'.local/share/fonts/**',
-					'.local/share/icons/**',
-					'.local/share/themes/**',
-					'.themes/**',
-					'.icons/**',
-					'.face',
-				],
-				'exclude': [
-					'.cache/**',
-					'.local/state/**',
-					'.local/share/zinit/**',
-					'.local/share/Trash/**',
-					'.local/share/recently-used*',
-					'.local/share/gvfs-metadata/**',
-					'.local/share/flatpak/**',
-					'.local/share/containers/**',
-					'.local/share/keyrings/**',
-					'.zcompdump*',
-					'.dbus/**',
-					'.Xauthority',
-					'.ICEauthority',
-					'.config/pulse/**',
-					'.config/chromium/**',
-					'.config/google-chrome/**',
-					'.config/BraveSoftware/**',
-					'.mozilla/**',
-					'.pki/**',
-					'/run/**',
-					'/tmp/**',
-					'/etc/machine-id',
-					'/var/lib/dbus/machine-id',
-					'/var/lib/systemd/random-seed',
-					'/var/lib/NetworkManager/**',
-					'/var/lib/pacman/local/**',
-				],
+	def _default_install_from_iso_config(self) -> dict[str, Any]:
+		return {
+			'groups': {
+				'configs': {
+					'include': [
+						'.zshrc',
+						'.bashrc',
+						'.profile',
+						'.zprofile',
+						'.zshenv',
+						'.config/**',
+						'.local/bin/**',
+						'.local/share/applications/**',
+						'.local/share/fonts/**',
+						'.local/share/icons/**',
+						'.local/share/themes/**',
+						'.themes/**',
+						'.icons/**',
+						'.face',
+					],
+					'exclude': [
+						'.cache/**',
+						'.local/state/**',
+						'.local/share/zinit/**',
+						'.local/share/Trash/**',
+						'.local/share/recently-used*',
+						'.local/share/gvfs-metadata/**',
+						'.local/share/flatpak/**',
+						'.local/share/containers/**',
+						'.local/share/keyrings/**',
+						'.zcompdump*',
+						'.dbus/**',
+						'.Xauthority',
+						'.ICEauthority',
+						'.config/pulse/**',
+						'.config/chromium/**',
+						'.config/google-chrome/**',
+						'.config/BraveSoftware/**',
+						'.mozilla/**',
+						'.pki/**',
+						'/run/**',
+						'/tmp/**',
+						'/etc/machine-id',
+						'/var/lib/dbus/machine-id',
+						'/var/lib/systemd/random-seed',
+						'/var/lib/NetworkManager/**',
+						'/var/lib/pacman/local/**',
+					],
+					'packages': ['grml-zsh-config', 'screen'],
+				},
+				'desktop': {
+					'include': [
+						'.config/gtk-3.0/**',
+						'.config/gtk-4.0/**',
+						'.config/hypr/**',
+						'.config/waybar/**',
+						'.config/sway/**',
+						'.config/xfce4/**',
+						'.config/i3/**',
+						'.config/awesome/**',
+						'.config/openbox/**',
+						'.config/qt5ct/**',
+						'.config/qt6ct/**',
+						'.config/alacritty/**',
+						'.config/kitty/**',
+						'.config/dunst/**',
+						'.config/picom/**',
+						'.config/polybar/**',
+						'.local/share/icons/**',
+						'.local/share/themes/**',
+						'.local/share/fonts/**',
+						'.themes/**',
+						'.icons/**',
+					],
+					'exclude': [
+						'.cache/**',
+						'.local/state/**',
+						'.local/share/zinit/**',
+						'.local/share/Trash/**',
+						'.local/share/recently-used*',
+						'.local/share/gvfs-metadata/**',
+						'.zcompdump*',
+						'.dbus/**',
+						'.Xauthority',
+						'.ICEauthority',
+						'/run/**',
+						'/tmp/**',
+						'/etc/machine-id',
+						'/var/lib/dbus/machine-id',
+						'/var/lib/systemd/random-seed',
+						'/var/lib/NetworkManager/**',
+						'/var/lib/pacman/local/**',
+					],
+					'packages': ['kitty', 'alacritty', 'hyprland', 'waybar', 'sway'],
+				},
+				'cache': {
+					'include': ['*'],
+					'exclude': [
+						'.local/share/zinit/**',
+						'.local/share/Trash/**',
+						'.local/share/recently-used*',
+						'.local/share/gvfs-metadata/**',
+						'.zcompdump*',
+						'.dbus/**',
+						'.Xauthority',
+						'.ICEauthority',
+						'/run/**',
+						'/tmp/**',
+						'/etc/machine-id',
+						'/var/lib/dbus/machine-id',
+						'/var/lib/systemd/random-seed',
+						'/var/lib/NetworkManager/**',
+						'/var/lib/pacman/local/**',
+					],
+					'packages': [
+						'chromium',
+						'google-chrome',
+						'brave',
+						'firefox',
+						'pulse',
+						'flatpak',
+					],
+				},
 			},
-			'user_home': {
-				'include': [
-					'.zshrc',
-					'.bashrc',
-					'.profile',
-					'.zprofile',
-					'.zshenv',
-					'.config/**',
-					'.local/bin/**',
-					'.local/share/applications/**',
-					'.local/share/fonts/**',
-					'.local/share/icons/**',
-					'.local/share/themes/**',
-					'.themes/**',
-					'.icons/**',
-					'.face',
-				],
-				'exclude': [
-					'.cache/**',
-					'.local/state/**',
-					'.local/share/zinit/**',
-					'.local/share/Trash/**',
-					'.local/share/recently-used*',
-					'.local/share/gvfs-metadata/**',
-					'.local/share/flatpak/**',
-					'.local/share/containers/**',
-					'.local/share/keyrings/**',
-					'.zcompdump*',
-					'.dbus/**',
-					'.Xauthority',
-					'.ICEauthority',
-					'.config/pulse/**',
-					'.config/chromium/**',
-					'.config/google-chrome/**',
-					'.config/BraveSoftware/**',
-					'.mozilla/**',
-					'.pki/**',
-					'/run/**',
-					'/tmp/**',
-					'/etc/machine-id',
-					'/var/lib/dbus/machine-id',
-					'/var/lib/systemd/random-seed',
-					'/var/lib/NetworkManager/**',
-					'/var/lib/pacman/local/**',
-				],
+			'packages': {
+				'grml-zsh-config': ['.zshrc'],
+				'screen': ['.screenrc'],
+				'kitty': ['.config/kitty/**'],
+				'alacritty': ['.config/alacritty/**'],
+				'hyprland': ['.config/hypr/**'],
+				'waybar': ['.config/waybar/**'],
+				'sway': ['.config/sway/**'],
+				'chromium': ['.config/chromium/**'],
+				'google-chrome': ['.config/google-chrome/**'],
+				'brave': ['.config/BraveSoftware/**'],
+				'firefox': ['.mozilla/**'],
+				'pulse': ['.config/pulse/**'],
+				'flatpak': ['.local/share/flatpak/**'],
 			},
 			'extra_paths': [{'source': '/etc/skel', 'destination': '/etc/skel'}],
 		}
 
-		if mode == 'configs_cache':
-			# More permissive: include browser and session caches/configs while still skipping machine IDs and known profile managers.
-			cache_exclude = [
-				'.local/share/zinit/**',
-				'.local/share/Trash/**',
-				'.local/share/recently-used*',
-				'.local/share/gvfs-metadata/**',
-				'.zcompdump*',
-				'.dbus/**',
-				'.Xauthority',
-				'.ICEauthority',
-				'/run/**',
-				'/tmp/**',
-				'/etc/machine-id',
-				'/var/lib/dbus/machine-id',
-				'/var/lib/systemd/random-seed',
-				'/var/lib/NetworkManager/**',
-				'/var/lib/pacman/local/**',
-			]
+	def _load_install_from_iso_config(self) -> dict[str, Any]:
+		if hasattr(self, '_install_from_iso_config_cache'):
+			return self._install_from_iso_config_cache  # type: ignore[attr-defined]
 
-			cache_include = ['*']  # copy everything, let excludes prune machine-specific/stateful bits
-
-			cache_config = {
-				'root_home': {'include': cache_include, 'exclude': cache_exclude},
-				'user_home': {'include': cache_include, 'exclude': cache_exclude},
-				'extra_paths': [{'source': '/etc/skel', 'destination': '/etc/skel'}],
-			}
-			return cache_config
-
-		return base
-
-	def _load_install_from_iso_config(self, mode: str = 'configs') -> dict[str, Any]:
-		if not hasattr(self, '_install_from_iso_config_cache'):
-			self._install_from_iso_config_cache = {}  # type: ignore[attr-defined]
-
-		cache: dict[str, dict[str, Any]] = self._install_from_iso_config_cache  # type: ignore[assignment]
-
-		if mode in cache:
-			return cache[mode]
-
-		default = self._default_install_from_iso_config(mode)
-		path = self._install_from_iso_config_path(mode)
+		default = self._default_install_from_iso_config()
+		path = self._install_from_iso_config_path()
 
 		if not path.exists():
-			cache[mode] = default
+			self._install_from_iso_config_cache = default  # type: ignore[attr-defined]
 			return default
 
 		try:
 			cfg = json.loads(path.read_text())
-			cache[mode] = cfg
+			self._install_from_iso_config_cache = cfg  # type: ignore[attr-defined]
 			return cfg
 		except Exception as err:
-			warn(f'Failed to read install_from_iso config for mode {mode}, using defaults: {err}')
-			cache[mode] = default
+			warn(f'Failed to read install_from_iso config, using defaults: {err}')
+			self._install_from_iso_config_cache = default  # type: ignore[attr-defined]
 			return default
+
+	def _resolve_package_paths(self, pkg: str, package_map: dict[str, list[str]]) -> list[str]:
+		if pkg in package_map:
+			return package_map[pkg]
+		warn(f'Unknown install-from-ISO package mapping for "{pkg}", ignoring')
+		return []
+
+	def _merge_iso_groups(self, cfg: dict[str, Any], groups: list[str]) -> dict[str, list[str]]:
+		data_groups = cfg.get('groups', {})
+		pkg_map = cfg.get('packages', {})
+
+		includes: list[str] = []
+		excludes: list[str] = []
+		extra_paths: list[dict[str, str]] = []
+
+		for name in groups:
+			group = data_groups.get(name, {})
+			incs = group.get('include', [])
+			excs = group.get('exclude', [])
+			pkgs = group.get('packages', [])
+			extra_paths.extend(group.get('extra_paths', []))
+
+			for entry in incs:
+				if entry not in includes:
+					includes.append(entry)
+			for entry in excs:
+				if entry not in excludes:
+					excludes.append(entry)
+			for pkg in pkgs:
+				for path in self._resolve_package_paths(pkg, pkg_map):
+					if path not in includes:
+						includes.append(path)
+
+		for extra in cfg.get('extra_paths', []):
+			extra_paths.append(extra)
+
+		return {
+			'include': includes or ['*'],
+			'exclude': excludes,
+			'extra_paths': extra_paths,
+		}
 
 	def _confirm_step(self, choice_key: str, actions: str) -> bool:
 		resp = input(f'Chosen: {choice_key}. {actions}. Continue? (Y/n): ').strip().lower()

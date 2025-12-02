@@ -304,9 +304,15 @@ class GlobalMenu(AbstractMenu[None]):
 
 	def _prev_entropy_tweaks(self, item: MenuItem) -> str | None:
 		flags = []
-		if self._arch_config.install_from_iso:
-			mode = getattr(self._arch_config, 'install_from_iso_mode', 'configs')
-			label = tr('Configs + Live Cache') if mode == 'configs_cache' else tr('Configs')
+		if getattr(self._arch_config, 'install_from_iso_enabled', False):
+			parts = []
+			if getattr(self._arch_config, 'iso_copy_configs', False):
+				parts.append(tr('Configs'))
+			if getattr(self._arch_config, 'iso_copy_desktop', False):
+				parts.append(tr('Desktop'))
+			if getattr(self._arch_config, 'iso_copy_cache', False):
+				parts.append(tr('Session Cache'))
+			label = ', '.join(parts) if parts else tr('Enabled')
 			flags.append(f"{tr('Install from ISO')}: {label}")
 		if getattr(self._arch_config, 'custom_script', False):
 			flags.append(tr('Custom script'))
