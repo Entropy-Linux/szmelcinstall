@@ -1,6 +1,6 @@
 # SzmelcInstall
 > ### *Archinstall fork for Entropy Linux*
-> ## Version: 10.3
+> ## Version: 10.3.1
 
 ---
 
@@ -50,3 +50,4 @@
 - Tune the JSON configs to add/remove paths. Excludes are globbed recursively.
 - Ctrl+h/Ctrl+i popups stay until Esc; put your own info in `INFO.md`.
 - If any step fails (pacstrap/repos), prompts let you retry, force, skip, or stop with a clear “Chosen: … Continue? Y/n” confirmation.
+
