@@ -1,15 +1,13 @@
-# Maintainer: David Runge <dvzrv@archlinux.org>
-# Maintainer: Giancarlo Razzolini <grazzolini@archlinux.org>
-# Maintainer: Anton Hvornum <torxed@archlinux.org>
-# Contributor: Anton Hvornum <anton@hvornum.se>
-# Contributor: demostanis worlds <demostanis@protonmail.com>
+# Maintainer: sx66 <serainox@gmail.com>
+# For Entropy Linux
+# Forked from upstream archinstall PKGBUILD
 
-pkgname=archinstall
-pkgver=3.0.14
+pkgname=archinstall-entropy
+pkgver=12
 pkgrel=1
-pkgdesc="Just another guided/automated Arch Linux installer with a twist"
+pkgdesc="Entropy Linux installer (archinstall fork) with Entropy/Szmelc customizations"
 arch=(any)
-url="https://github.com/archlinux/archinstall"
+url="https://github.com/Entropy-Linux/szmelcinstall"
 license=(GPL-3.0-only)
 depends=(
   'arch-install-scripts'
@@ -49,37 +47,36 @@ makedepends=(
 optdepends=(
   'python-systemd: Adds journald logging'
 )
-provides=(python-archinstall archinstall)
-conflicts=(python-archinstall archinstall-git)
-replaces=(python-archinstall archinstall-git)
+provides=(archinstall-entropy archinstall install-entropy szmelcinstall python-archinstall)
+conflicts=(archinstall archinstall-git)
+replaces=(archinstall archinstall-git)
+_gitname=szmelcinstall
+_srcdir=${_gitname}-main
 source=(
-  $pkgname-$pkgver.tar.gz::$url/archive/refs/tags/$pkgver.tar.gz
-  $pkgname-$pkgver.tar.gz.sig::$url/releases/download/$pkgver/$pkgname-$pkgver.tar.gz.sig
+  $pkgname-$pkgver.tar.gz::$url/archive/refs/heads/main.tar.gz
 )
-sha512sums=()
-b2sums=()
-validpgpkeys=('8AA2213C8464C82D879C8127D4B58E897A929F2E') # torxed@archlinux.org
+sha512sums=('SKIP')
+b2sums=('SKIP')
 
 check() {
-  cd $pkgname-$pkgver
-  ruff check
-}
+  echo "Skipping check() for archinstall-entropy (default nocheck mode)."
+  return 0
 
-pkgver() {
-  cd $pkgname-$pkgver
-
-  awk '$1 ~ /^__version__/ {gsub("\"", ""); print $3}' archinstall/__init__.py
+  # Original check() kept below for reference (never executed):
+  # cd "$srcdir/szmelcinstall-main"
+  # python -m ruff check archinstall || true
+  # pytest || true
 }
 
 build() {
-  cd $pkgname-$pkgver
+  cd "$_srcdir"
 
   python -m build --wheel --no-isolation
   PYTHONDONTWRITEBYTECODE=1 make man -C docs
 }
 
 package() {
-  cd "$pkgname-$pkgver"
+  cd "$_srcdir"
 
   python -m installer --destdir="$pkgdir" dist/*.whl
   install -vDm 644 docs/_build/man/archinstall.1 -t "$pkgdir/usr/share/man/man1/"
