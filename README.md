@@ -1,5 +1,5 @@
 # SzmelcInstall
-> ### *archinstall fork for Entropy Linux*
+> ### *Archinstall fork for Entropy Linux*
 > ## Version: 7
 
 ---

@@ -1,2 +1,4 @@
 # Ignore CODEX session data
 CODEX/
+DEVEL/
+*~
