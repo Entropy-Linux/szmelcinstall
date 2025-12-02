@@ -1,0 +1,12 @@
+on: [ push, pull_request ]
+name: Bandit security checkup
+jobs:
+    bandit:
+        runs-on: ubuntu-latest
+        container:
+            image: archlinux/archlinux:latest
+        steps:
+            - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+            - run: pacman --noconfirm -Syu bandit
+            - name: Security checkup with Bandit
+              run: bandit -r archinstall || exit 0

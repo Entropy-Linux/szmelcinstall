@@ -1,0 +1,9 @@
+on: [ push, pull_request ]
+name: ruff check formatting
+jobs:
+  ruff_format_check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+      - uses: astral-sh/ruff-action@57714a7c8a2e59f32539362ba31877a1957dded1  # v3.5.1
+      - run: ruff format --diff

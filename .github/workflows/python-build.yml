@@ -1,0 +1,39 @@
+# This workflow will build Python packages on every commit.
+
+name: Build archinstall
+
+on: [ push, pull_request ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux/archlinux:latest
+      options: --privileged
+    steps:
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+      - name: Prepare arch
+        run: |
+          pacman-key --init
+          pacman --noconfirm -Sy archlinux-keyring
+          pacman --noconfirm -Syyu
+          pacman --noconfirm -Sy python-uv python-setuptools python-pip
+          pacman --noconfirm -Sy python-pyparted python-pydantic
+      - name: Remove existing archinstall (if any)
+        run: 
+          uv pip uninstall archinstall --break-system-packages --system
+      - name: Build archinstall
+        run: uv build --no-build-isolation --wheel
+      - name: Install archinstall
+        run: |
+          uv pip install dist/*.whl --break-system-packages --system --no-build --no-deps
+      - name: Run archinstall
+        run: |
+          python -V
+          archinstall --script guided -v
+          archinstall --script only_hd -v
+          archinstall --script minimal -v
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: archinstall
+          path: dist/*
