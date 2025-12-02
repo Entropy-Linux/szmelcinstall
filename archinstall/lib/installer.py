@@ -963,6 +963,9 @@ class Installer:
 		root_cfg = cfg.get('root_home', {})
 		user_cfg = cfg.get('user_home', {})
 
+		# Install packages from the live ISO first to avoid file conflicts with /etc/skel.
+		self.add_live_iso_packages()
+
 		self.copy_root_home(
 			include=root_cfg.get('include', ['*']),
 			exclude=root_cfg.get('exclude', []),
@@ -973,7 +976,6 @@ class Installer:
 			exclude=user_cfg.get('exclude', []),
 		)
 		self._copy_extra_paths(cfg.get('extra_paths', []))
-		self.add_live_iso_packages()
 
 	def _copy_extra_paths(self, entries: list[dict[str, str]]) -> None:
 		for entry in entries:
