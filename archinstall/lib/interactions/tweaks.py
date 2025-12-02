@@ -3,6 +3,7 @@ from archinstall.tui.curses_menu import SelectMenu
 from archinstall.tui.menu_item import MenuItem, MenuItemGroup
 from archinstall.tui.result import ResultType
 from archinstall.tui.types import Alignment, Orientation
+from archinstall.lib.entropy.menus import select_asset_packs, select_config_packs, select_kits, select_szmelc_packages
 
 from ..args import ArchConfig
 from ..menu.abstract_menu import AbstractSubMenu
@@ -78,11 +79,39 @@ class EntropyTweaksMenu(AbstractSubMenu[None]):
 				key='custom_script',
 			),
 			MenuItem(
+				text=tr('Entropy kits'),
+				value=config.entropy_kits,
+				action=select_kits,
+				preview_action=lambda item: ', '.join(item.value) if item.value else tr('None'),
+				key='entropy_kits',
+			),
+			MenuItem(
 				text=tr('Szmelc AUR'),
 				value=config.szmelc_aur,
 				action=_toggle_bool,
 				preview_action=lambda item: tr('Enabled') if item.value else tr('Disabled'),
 				key='szmelc_aur',
+			),
+			MenuItem(
+				text=tr('Szmelc packages'),
+				value=config.entropy_szmelc_packages,
+				action=select_szmelc_packages,
+				preview_action=lambda item: ', '.join(item.value) if item.value else tr('None'),
+				key='entropy_szmelc_packages',
+			),
+			MenuItem(
+				text=tr('Szmelc configs'),
+				value=config.entropy_config_packs,
+				action=select_config_packs,
+				preview_action=lambda item: ', '.join(item.value) if item.value else tr('None'),
+				key='entropy_config_packs',
+			),
+			MenuItem(
+				text=tr('Szmelc assets'),
+				value=config.entropy_asset_packs,
+				action=select_asset_packs,
+				preview_action=lambda item: ', '.join(item.value) if item.value else tr('None'),
+				key='entropy_asset_packs',
 			),
 		]
 

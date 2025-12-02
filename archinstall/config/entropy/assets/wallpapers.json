@@ -1,0 +1,10 @@
+{
+  "id": "asset-wallpapers",
+  "name": "Wallpapers",
+  "dependencies": [],
+  "configs": [
+    {"src": "files/assets/wallpapers/entropy-wallpaper.txt", "dest": "/usr/share/backgrounds/entropy/wallpaper.txt"}
+  ],
+  "post_commands": [],
+  "description": "Wallpaper pack placeholder"
+}

@@ -312,6 +312,14 @@ class GlobalMenu(AbstractMenu[None]):
 			flags.append(tr('Custom script'))
 		if self._arch_config.szmelc_aur:
 			flags.append('Szmelc AUR')
+		if getattr(self._arch_config, 'entropy_kits', []):
+			flags.append(tr('Kits: {}').format(len(self._arch_config.entropy_kits)))
+		if getattr(self._arch_config, 'entropy_szmelc_packages', []):
+			flags.append(tr('Szmelc packages: {}').format(len(self._arch_config.entropy_szmelc_packages)))
+		if getattr(self._arch_config, 'entropy_config_packs', []):
+			flags.append(tr('Configs: {}').format(len(self._arch_config.entropy_config_packs)))
+		if getattr(self._arch_config, 'entropy_asset_packs', []):
+			flags.append(tr('Assets: {}').format(len(self._arch_config.entropy_asset_packs)))
 		return ', '.join(flags) if flags else tr('No tweaks enabled')
 
 	def _prev_arch_tweaks(self, item: MenuItem) -> str | None:

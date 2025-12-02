@@ -1,0 +1,11 @@
+{
+  "id": "cfg-hardening",
+  "name": "Szmelc Hardening",
+  "dependencies": [],
+  "include_packages": ["ufw"],
+  "configs": [
+    {"src": "files/sysctl/60-hardening.conf", "dest": "/etc/sysctl.d/60-hardening.conf"}
+  ],
+  "post_commands": ["systemctl enable ufw"],
+  "description": "Firewall and sysctl defaults"
+}

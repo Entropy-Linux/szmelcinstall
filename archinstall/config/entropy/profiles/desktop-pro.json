@@ -1,0 +1,12 @@
+{
+  "id": "desktop-pro",
+  "name": "Desktop PRO (Hyprland)",
+  "include_packages": ["hyprland", "waybar", "kitty", "thunar", "xdg-desktop-portal-hyprland"],
+  "exclude_packages": [],
+  "configs": [
+    {"src": "files/hypr/hyprland.conf", "dest": "/etc/entropy/hyprland.conf"},
+    {"src": "files/assets/themes/hypr-theme.conf", "dest": "/etc/entropy/theme.conf"}
+  ],
+  "post_commands": ["echo 'Hyprland profile installed' > /etc/entropy-profile"],
+  "description": "Hyprland-first desktop stack with Waybar and Kitty"
+}

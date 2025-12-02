@@ -12,6 +12,7 @@ from archinstall.lib.global_menu import GlobalMenu
 from archinstall.lib.installer import Installer, accessibility_tools_in_use, run_custom_user_commands
 from archinstall.lib.interactions.general_conf import PostInstallationAction, ask_post_installation
 from archinstall.lib.models import Bootloader
+from archinstall.lib.entropy import apply_payload, payload_from_config
 from archinstall.lib.models.device import (
 	DiskLayoutType,
 	EncryptionType,
@@ -239,6 +240,10 @@ def perform_installation(mountpoint: Path) -> None:
 
 		if config.packages and config.packages[0] != '':
 			installation.add_additional_packages(config.packages)
+
+		entropy_payload = payload_from_config(config)
+		if entropy_payload.include_packages or entropy_payload.configs or entropy_payload.post_commands:
+			apply_payload(installation, entropy_payload)
 
 		if timezone := config.timezone:
 			installation.set_timezone(timezone)

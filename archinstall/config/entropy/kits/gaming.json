@@ -1,0 +1,11 @@
+{
+  "id": "kit-gaming",
+  "name": "Gaming",
+  "include_packages": ["steam", "lutris", "gamemode"],
+  "exclude_packages": [],
+  "configs": [
+    {"src": "files/sysctl/70-gaming.conf", "dest": "/etc/sysctl.d/70-gaming.conf"}
+  ],
+  "post_commands": ["systemctl enable gamemoded"],
+  "description": "Gaming helpers including Steam and gamemode"
+}

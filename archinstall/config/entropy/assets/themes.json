@@ -1,0 +1,10 @@
+{
+  "id": "asset-themes",
+  "name": "Themes",
+  "dependencies": ["asset-fonts"],
+  "configs": [
+    {"src": "files/assets/themes/hypr-theme.conf", "dest": "/usr/share/entropy-themes/hypr.conf"}
+  ],
+  "post_commands": [],
+  "description": "Theme snippets for desktops"
+}

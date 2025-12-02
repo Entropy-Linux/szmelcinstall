@@ -1,0 +1,11 @@
+{
+  "id": "kit-network",
+  "name": "Network",
+  "include_packages": ["networkmanager", "nm-connection-editor", "wireguard-tools"],
+  "exclude_packages": [],
+  "configs": [
+    {"src": "files/assets/wallpapers/entropy-wallpaper.txt", "dest": "/etc/entropy/network-note.txt"}
+  ],
+  "post_commands": ["systemctl enable NetworkManager"],
+  "description": "Network utilities and WireGuard tools"
+}

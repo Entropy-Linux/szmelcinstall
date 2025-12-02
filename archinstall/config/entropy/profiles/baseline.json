@@ -1,0 +1,12 @@
+{
+  "id": "entropy-baseline",
+  "name": "Baseline",
+  "include_packages": ["git", "vim", "htop"],
+  "exclude_packages": [],
+  "configs": [
+    {"src": "files/motd-baseline", "dest": "/etc/motd"},
+    {"src": "files/sysctl/99-entropy.conf", "dest": "/etc/sysctl.d/99-entropy.conf"}
+  ],
+  "post_commands": ["echo 'Entropy Baseline ready' > /etc/entropy-profile"],
+  "description": "Minimal defaults and a small welcome banner"
+}

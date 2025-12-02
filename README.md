@@ -1,6 +1,6 @@
 # SzmelcInstall
 > ### *Archinstall fork for Entropy Linux*
-> ## Version: 11
+> ## Version: 12
 
 ---
 
@@ -24,6 +24,8 @@
 - Install-from-ISO with two modes: **Configs** (safe, curated includes/excludes) or **Configs + Live Cache** (bring almost everything from the live session). Configs live in `config/install_from_iso.json` and `config/install_from_iso_cache.json`. Both modes copy dotfiles, themes/icons/fonts, `/etc/skel`, and reinstall the live ISO package set while skipping machine IDs and other bad state.
 - Entropy Tweaks: Install-from-ISO mode selector and Szmelc AUR repo toggle (Optional/TrustAll, `packages.szmelc.com`).
 - Custom script hook (toggle in Entropy Tweaks): runs `custom.sh` stages before/after major steps. Edit `archinstall/custom.sh` to add per-stage commands; missing or commented stages are skipped.
+- Entropy profile family (Baseline, Server, Desktop PRO/LITE) with JSON metadata in `config/entropy/profiles` and runner `default_profiles/entropy-profiles.py`.
+- JSON-driven Entropy kits, Szmelc config packs, asset packs, and Szmelc package picker under Entropy Tweaks (merges include/exclude packages, config copies, and post-commands).
 - Arch Tweaks: yay (from Chaotic AUR via pacman) and Chaotic AUR repo setup with interactive retry/force/skip/stop.
 - Pacstrap conflict/missing handlers (remove/choose/force/skip, manual rename, strip version) with confirmation prompts.
 - TUI niceties: Entropy-branded header, Ctrl+h help, Ctrl+i info (`INFO.md`), Entropy/Arch Tweaks pinned to the top.
@@ -37,6 +39,8 @@
    - **Install from ISO**: pick **Configs** (default) or **Configs + Live Cache**; pick **Disabled** to skip. Edit the JSON files if you want different include/exclude lists.
    - **Szmelc AUR**: leave on to add the repo automatically.
    - **Custom script**: enable to run `custom.sh` stages. Each stage (1–10) corresponds to before/after initialization, user config, pre-install, installation, and post-install. Commands run with `stage` env set to the stage name.
+   - **Entropy kits**: select JSON-defined kits (dev, network, creator, gaming) from `config/entropy/kits`.
+   - **Szmelc packages/configs/assets**: pick packages from the Szmelc repo plus optional config and asset packs (`config/entropy/configs`, `config/entropy/assets`).
 4) Open **Arch Tweaks**:
    - **Install yay**: installs yay from Chaotic AUR.
    - **Chaotic AUR**: adds keys/keyring/mirrorlist with interactive error handling.

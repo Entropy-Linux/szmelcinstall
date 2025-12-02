@@ -1,0 +1,11 @@
+{
+  "id": "kit-creator",
+  "name": "Creator",
+  "include_packages": ["gimp", "inkscape", "krita"],
+  "exclude_packages": [],
+  "configs": [
+    {"src": "files/assets/fonts/entropy-fonts.txt", "dest": "/usr/share/fonts/entropy-fonts.txt"}
+  ],
+  "post_commands": [],
+  "description": "Media creation tools for artists"
+}

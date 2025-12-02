@@ -1,0 +1,11 @@
+{
+  "id": "cfg-logging",
+  "name": "Szmelc Logging",
+  "dependencies": ["cfg-hardening"],
+  "include_packages": ["rsyslog"],
+  "configs": [
+    {"src": "files/assets/themes/logging-note.txt", "dest": "/etc/entropy/logging-note.txt"}
+  ],
+  "post_commands": [],
+  "description": "Adds extra journal tooling"
+}

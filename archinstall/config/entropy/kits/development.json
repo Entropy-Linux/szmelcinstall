@@ -1,0 +1,11 @@
+{
+  "id": "kit-development",
+  "name": "Development",
+  "include_packages": ["base-devel", "git", "python-pip", "docker"],
+  "exclude_packages": [],
+  "configs": [
+    {"src": "files/sysctl/80-development.conf", "dest": "/etc/sysctl.d/80-development.conf"}
+  ],
+  "post_commands": ["systemctl enable docker"],
+  "description": "Tooling for developers with Docker enabled"
+}

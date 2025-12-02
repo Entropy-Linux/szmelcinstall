@@ -1,0 +1,12 @@
+{
+  "id": "desktop-lite",
+  "name": "Desktop LITE (XFCE4)",
+  "include_packages": ["xfce4", "xfce4-goodies", "lightdm", "lightdm-gtk-greeter"],
+  "exclude_packages": [],
+  "configs": [
+    {"src": "files/xfce/xfce4-keyboard.conf", "dest": "/etc/xdg/xfce4/xfconf/xfce-perchannel-xml/keyboard-layout.xml"},
+    {"src": "files/assets/wallpapers/entropy-wallpaper.txt", "dest": "/usr/share/backgrounds/entropy-wallpaper.txt"}
+  ],
+  "post_commands": ["systemctl enable lightdm"],
+  "description": "Lightweight XFCE desktop with a minimal greeter"
+}

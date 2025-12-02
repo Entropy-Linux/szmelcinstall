@@ -1,0 +1,12 @@
+{
+  "id": "entropy-server",
+  "name": "Entropy Server",
+  "include_packages": ["git", "vim", "fail2ban", "openssh"],
+  "exclude_packages": [],
+  "configs": [
+    {"src": "files/sshd/banner", "dest": "/etc/ssh/sshd_banner"},
+    {"src": "files/sysctl/90-server.conf", "dest": "/etc/sysctl.d/90-server.conf"}
+  ],
+  "post_commands": ["systemctl enable fail2ban"],
+  "description": "Adds server-hardening defaults and enables fail2ban"
+}

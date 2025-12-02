@@ -84,6 +84,10 @@ class ArchConfig:
 	chaotic_aur: bool = True
 	entropy_tweaks: bool | None = None
 	arch_tweaks: bool | None = None
+	entropy_kits: list[str] = field(default_factory=list)
+	entropy_config_packs: list[str] = field(default_factory=list)
+	entropy_asset_packs: list[str] = field(default_factory=list)
+	entropy_szmelc_packages: list[str] = field(default_factory=list)
 
 	def unsafe_json(self) -> dict[str, Any]:
 		config: dict[str, list[UserSerialization] | str | None] = {}
@@ -125,6 +129,10 @@ class ArchConfig:
 			'bootloader_config': self.bootloader_config.json() if self.bootloader_config else None,
 			'app_config': self.app_config.json() if self.app_config else None,
 			'auth_config': self.auth_config.json() if self.auth_config else None,
+			'entropy_kits': self.entropy_kits,
+			'entropy_config_packs': self.entropy_config_packs,
+			'entropy_asset_packs': self.entropy_asset_packs,
+			'entropy_szmelc_packages': self.entropy_szmelc_packages,
 		}
 
 		if self.locale_config:
@@ -242,6 +250,18 @@ class ArchConfig:
 
 		if 'szmelc_aur' in args_config:
 			arch_config.szmelc_aur = bool(args_config['szmelc_aur'])
+
+		if 'entropy_kits' in args_config:
+			arch_config.entropy_kits = list(args_config['entropy_kits'])
+
+		if 'entropy_config_packs' in args_config:
+			arch_config.entropy_config_packs = list(args_config['entropy_config_packs'])
+
+		if 'entropy_asset_packs' in args_config:
+			arch_config.entropy_asset_packs = list(args_config['entropy_asset_packs'])
+
+		if 'entropy_szmelc_packages' in args_config:
+			arch_config.entropy_szmelc_packages = list(args_config['entropy_szmelc_packages'])
 
 		if 'install_yay' in args_config:
 			arch_config.install_yay = bool(args_config['install_yay'])

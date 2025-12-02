@@ -1,0 +1,10 @@
+{
+  "id": "asset-fonts",
+  "name": "Fonts",
+  "dependencies": [],
+  "configs": [
+    {"src": "files/assets/fonts/entropy-fonts.txt", "dest": "/usr/share/fonts/entropy/README"}
+  ],
+  "post_commands": ["fc-cache -fv"],
+  "description": "Font bundle placeholder"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "cfg-desktop-polish",
+  "name": "Desktop Polish",
+  "dependencies": [],
+  "include_packages": ["xdg-user-dirs", "xdg-desktop-portal"],
+  "configs": [
+    {"src": "files/assets/wallpapers/entropy-wallpaper.txt", "dest": "/usr/share/backgrounds/entropy-desktop.txt"}
+  ],
+  "post_commands": ["xdg-user-dirs-update"],
+  "description": "Desktop niceties and XDG defaults"
+}
