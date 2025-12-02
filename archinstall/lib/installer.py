@@ -966,6 +966,8 @@ class Installer:
 		# Install packages from the live ISO first to avoid file conflicts with /etc/skel.
 		self.add_live_iso_packages()
 
+		self._copy_extra_paths(cfg.get('extra_paths', []))
+
 		self.copy_root_home(
 			include=root_cfg.get('include', ['*']),
 			exclude=root_cfg.get('exclude', []),
@@ -975,7 +977,7 @@ class Installer:
 			include=user_cfg.get('include', ['*']),
 			exclude=user_cfg.get('exclude', []),
 		)
-		self._copy_extra_paths(cfg.get('extra_paths', []))
+		self._populate_users_from_skel(users)
 
 	def _copy_extra_paths(self, entries: list[dict[str, str]]) -> None:
 		for entry in entries:
@@ -1004,6 +1006,47 @@ class Installer:
 					shutil.copy2(source, dest_path, follow_symlinks=False)
 			except Exception as err:
 				warn(f'Unable to copy extra path {source} to {dest_path}: {err}')
+
+	def _populate_users_from_skel(self, users: list[User]) -> None:
+		if not users:
+			return
+
+		skel_path = self.target / 'etc' / 'skel'
+		if not skel_path.exists():
+			debug('No /etc/skel present on target, skipping skel population')
+			return
+
+		for user in users:
+			home = self.target / 'home' / user.username
+			if not home.exists():
+				continue
+
+			for root, dirs, files in os.walk(skel_path):
+				root_path = Path(root)
+				for name in dirs + files:
+					src = root_path / name
+					try:
+						rel = src.relative_to(skel_path)
+					except ValueError:
+						continue
+
+					dst = home / rel
+					if dst.exists():
+						continue
+
+					try:
+						if src.is_dir() and not src.is_symlink():
+							dst.mkdir(parents=True, exist_ok=True)
+						else:
+							dst.parent.mkdir(parents=True, exist_ok=True)
+							shutil.copy2(src, dst, follow_symlinks=False)
+					except Exception as err:
+						warn(f'Failed to copy skel entry {src} to {dst}: {err}')
+
+			try:
+				self.arch_chroot(f'chown -R {user.username}:{user.username} /home/{user.username}')
+			except SysCallError as err:
+				warn(f'Failed to update ownership after skel copy for {user.username}: {err}')
 
 	def _install_from_iso_config_path(self) -> Path:
 		return Path(__file__).resolve().parent.parent / 'config' / 'install_from_iso.json'

@@ -1,6 +1,6 @@
 # SzmelcInstall
 > ### *Archinstall fork for Entropy Linux*
-> ## Version: 8
+> ## Version: 9
 
 ---
 
