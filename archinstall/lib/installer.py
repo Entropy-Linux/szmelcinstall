@@ -965,10 +965,14 @@ class Installer:
 		return sorted_packages
 
 	def apply_install_from_iso(self, users: list[User]) -> None:
-		cfg = self._load_install_from_iso_config()
 		config = arch_config_handler.config
 		if not getattr(config, 'install_from_iso_enabled', False):
 			return
+
+		cfg = self._load_install_from_iso_config()
+
+		# Always install live ISO packages first to avoid file conflicts with /etc/skel.
+		self.add_live_iso_packages()
 
 		selected_groups = []
 		if getattr(config, 'iso_copy_configs', False):
@@ -980,24 +984,22 @@ class Installer:
 
 		if not selected_groups:
 			debug('Install from ISO enabled but no groups selected, skipping home copy')
-		else:
-			merged = self._merge_iso_groups(cfg, selected_groups)
+			return
 
-			# Install packages from the live ISO first to avoid file conflicts with /etc/skel.
-			self.add_live_iso_packages()
+		merged = self._merge_iso_groups(cfg, selected_groups, config)
 
-			self._copy_extra_paths(merged.get('extra_paths', []))
+		self._copy_extra_paths(merged.get('extra_paths', []))
 
-			self.copy_root_home(
-				include=merged.get('include', ['*']),
-				exclude=merged.get('exclude', []),
-			)
-			self.copy_live_user_home(
-				users,
-				include=merged.get('include', ['*']),
-				exclude=merged.get('exclude', []),
-			)
-			self._populate_users_from_skel(users)
+		self.copy_root_home(
+			include=merged.get('include', ['*']),
+			exclude=merged.get('exclude', []),
+		)
+		self.copy_live_user_home(
+			users,
+			include=merged.get('include', ['*']),
+			exclude=merged.get('exclude', []),
+		)
+		self._populate_users_from_skel(users)
 
 	def _copy_extra_paths(self, entries: list[dict[str, str]]) -> None:
 		for entry in entries:
@@ -1239,13 +1241,41 @@ class Installer:
 		warn(f'Unknown install-from-ISO package mapping for "{pkg}", ignoring')
 		return []
 
-	def _merge_iso_groups(self, cfg: dict[str, Any], groups: list[str]) -> dict[str, list[str]]:
+	def _get_gui_packages(self) -> set[str]:
+		if hasattr(self, '_gui_package_cache'):
+			return self._gui_package_cache  # type: ignore[attr-defined]
+
+		gui_pkgs: set[str] = set()
+		try:
+			out = subprocess.check_output(
+				['pactree', '-r', '-u', 'wayland'],
+				text=True,
+				stderr=subprocess.DEVNULL,
+			)
+			for line in out.splitlines():
+				name = line.strip()
+				if name:
+					gui_pkgs.add(name)
+		except Exception as err:
+			warn(f'Unable to resolve GUI package set via pactree: {err}')
+
+		self._gui_package_cache = gui_pkgs  # type: ignore[attr-defined]
+		return gui_pkgs
+
+	def _merge_iso_groups(self, cfg: dict[str, Any], groups: list[str], config: Any) -> dict[str, list[str]]:
 		data_groups = cfg.get('groups', {})
 		pkg_map = cfg.get('packages', {})
 
 		includes: list[str] = []
 		excludes: list[str] = []
 		extra_paths: list[dict[str, str]] = []
+
+		config_enabled = getattr(config, 'iso_copy_configs', False)
+		desktop_enabled = getattr(config, 'iso_copy_desktop', False)
+		cache_enabled = getattr(config, 'iso_copy_cache', False)
+
+		all_config_patterns: list[str] = []
+		all_desktop_patterns: list[str] = []
 
 		for name in groups:
 			group = data_groups.get(name, {})
@@ -1265,8 +1295,42 @@ class Installer:
 					if path not in includes:
 						includes.append(path)
 
+			if name == 'configs':
+				all_config_patterns.extend(incs)
+				for pkg in pkgs:
+					all_config_patterns.extend(self._resolve_package_paths(pkg, pkg_map))
+			if name == 'desktop':
+				all_desktop_patterns.extend(incs)
+				for pkg in pkgs:
+					all_desktop_patterns.extend(self._resolve_package_paths(pkg, pkg_map))
+
 		for extra in cfg.get('extra_paths', []):
 			extra_paths.append(extra)
+
+		gui_pkgs = self._get_gui_packages()
+		gui_patterns: list[str] = []
+		for pkg in gui_pkgs:
+			gui_patterns.extend(self._resolve_package_paths(pkg, pkg_map))
+		gui_patterns.extend(all_desktop_patterns)
+
+		# Rule: desktop disabled overrides GUI content (configs and caches)
+		if not desktop_enabled:
+			for pat in gui_patterns:
+				if pat not in excludes:
+					excludes.append(pat)
+
+		# Cache-only should avoid configs/desktop content
+		cache_only = cache_enabled and not config_enabled and not desktop_enabled
+		if cache_only:
+			for pat in all_config_patterns + all_desktop_patterns:
+				if pat not in excludes:
+					excludes.append(pat)
+
+		# Config+Cache without desktop: exclude GUI paths
+		if config_enabled and cache_enabled and not desktop_enabled:
+			for pat in gui_patterns:
+				if pat not in excludes:
+					excludes.append(pat)
 
 		return {
 			'include': includes or ['*'],
