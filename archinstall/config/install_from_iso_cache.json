@@ -1,30 +1,7 @@
 {
   "root_home": {
     "include": [
-      ".zshrc",
-      ".bashrc",
-      ".profile",
-      ".zprofile",
-      ".zshenv",
-      ".config/**",
-      ".local/bin/**",
-      ".local/share/applications/**",
-      ".local/share/fonts/**",
-      ".local/share/icons/**",
-      ".local/share/themes/**",
-      ".themes/**",
-      ".icons/**",
-      ".face",
-      ".cache/**",
-      ".config/pulse/**",
-      ".config/chromium/**",
-      ".config/google-chrome/**",
-      ".config/BraveSoftware/**",
-      ".mozilla/**",
-      ".pki/**",
-      ".local/share/flatpak/**",
-      ".local/share/containers/**",
-      ".local/share/keyrings/**"
+      "*"
     ],
     "exclude": [
       ".local/share/zinit/**",
@@ -46,30 +23,7 @@
   },
   "user_home": {
     "include": [
-      ".zshrc",
-      ".bashrc",
-      ".profile",
-      ".zprofile",
-      ".zshenv",
-      ".config/**",
-      ".local/bin/**",
-      ".local/share/applications/**",
-      ".local/share/fonts/**",
-      ".local/share/icons/**",
-      ".local/share/themes/**",
-      ".themes/**",
-      ".icons/**",
-      ".face",
-      ".cache/**",
-      ".config/pulse/**",
-      ".config/chromium/**",
-      ".config/google-chrome/**",
-      ".config/BraveSoftware/**",
-      ".mozilla/**",
-      ".pki/**",
-      ".local/share/flatpak/**",
-      ".local/share/containers/**",
-      ".local/share/keyrings/**"
+      "*"
     ],
     "exclude": [
       ".local/share/zinit/**",

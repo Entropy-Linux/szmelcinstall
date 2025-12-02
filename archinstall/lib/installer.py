@@ -1176,18 +1176,7 @@ class Installer:
 				'/var/lib/pacman/local/**',
 			]
 
-			cache_include = base['user_home']['include'] + [
-				'.cache/**',
-				'.config/pulse/**',
-				'.config/chromium/**',
-				'.config/google-chrome/**',
-				'.config/BraveSoftware/**',
-				'.mozilla/**',
-				'.pki/**',
-				'.local/share/flatpak/**',
-				'.local/share/containers/**',
-				'.local/share/keyrings/**',
-			]
+			cache_include = ['*']  # copy everything, let excludes prune machine-specific/stateful bits
 
 			cache_config = {
 				'root_home': {'include': cache_include, 'exclude': cache_exclude},
