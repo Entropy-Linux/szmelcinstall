@@ -52,3 +52,13 @@
 - Tune the JSON configs to add/remove paths. Excludes are globbed recursively.
 - Ctrl+h/Ctrl+i popups stay until Esc; put your own info in `INFO.md`.
 - If any step fails (pacstrap/repos), prompts let you retry, force, skip, or stop with a clear “Chosen: … Continue? Y/n” confirmation.
+
+---
+
+# TO-DO
+> - Improve "Install from ISO" feature for more granular control \
+> - Add feature to install without previously formatting partition (install on top of old system) \
+> - Add "Repair", "Reinstall", "Backup" hooks \
+> - Add "Clone drive/part" feature, to clone partitions \
+> - Add feature to install from squashed fs and hook to squash partition \
+> - Add extensive backup features, to and from URL or file. 
