@@ -959,7 +959,8 @@ class Installer:
 		return sorted_packages
 
 	def apply_install_from_iso(self, users: list[User]) -> None:
-		cfg = self._load_install_from_iso_config()
+		mode = getattr(arch_config_handler.config, 'install_from_iso_mode', 'configs') or 'configs'
+		cfg = self._load_install_from_iso_config(mode)
 		root_cfg = cfg.get('root_home', {})
 		user_cfg = cfg.get('user_home', {})
 
@@ -1048,11 +1049,12 @@ class Installer:
 			except SysCallError as err:
 				warn(f'Failed to update ownership after skel copy for {user.username}: {err}')
 
-	def _install_from_iso_config_path(self) -> Path:
-		return Path(__file__).resolve().parent.parent / 'config' / 'install_from_iso.json'
+	def _install_from_iso_config_path(self, mode: str) -> Path:
+		filename = 'install_from_iso_cache.json' if mode == 'configs_cache' else 'install_from_iso.json'
+		return Path(__file__).resolve().parent.parent / 'config' / filename
 
-	def _load_install_from_iso_config(self) -> dict[str, Any]:
-		default = {
+	def _default_install_from_iso_config(self, mode: str) -> dict[str, Any]:
+		base = {
 			'root_home': {
 				'include': [
 					'.zshrc',
@@ -1063,18 +1065,33 @@ class Installer:
 					'.config/**',
 					'.local/bin/**',
 					'.local/share/applications/**',
+					'.local/share/fonts/**',
+					'.local/share/icons/**',
+					'.local/share/themes/**',
 					'.themes/**',
 					'.icons/**',
+					'.face',
 				],
 				'exclude': [
 					'.cache/**',
 					'.local/state/**',
 					'.local/share/zinit/**',
+					'.local/share/Trash/**',
+					'.local/share/recently-used*',
+					'.local/share/gvfs-metadata/**',
+					'.local/share/flatpak/**',
+					'.local/share/containers/**',
+					'.local/share/keyrings/**',
 					'.zcompdump*',
 					'.dbus/**',
 					'.Xauthority',
 					'.ICEauthority',
 					'.config/pulse/**',
+					'.config/chromium/**',
+					'.config/google-chrome/**',
+					'.config/BraveSoftware/**',
+					'.mozilla/**',
+					'.pki/**',
 					'/run/**',
 					'/tmp/**',
 					'/etc/machine-id',
@@ -1094,18 +1111,33 @@ class Installer:
 					'.config/**',
 					'.local/bin/**',
 					'.local/share/applications/**',
+					'.local/share/fonts/**',
+					'.local/share/icons/**',
+					'.local/share/themes/**',
 					'.themes/**',
 					'.icons/**',
+					'.face',
 				],
 				'exclude': [
 					'.cache/**',
 					'.local/state/**',
 					'.local/share/zinit/**',
+					'.local/share/Trash/**',
+					'.local/share/recently-used*',
+					'.local/share/gvfs-metadata/**',
+					'.local/share/flatpak/**',
+					'.local/share/containers/**',
+					'.local/share/keyrings/**',
 					'.zcompdump*',
 					'.dbus/**',
 					'.Xauthority',
 					'.ICEauthority',
 					'.config/pulse/**',
+					'.config/chromium/**',
+					'.config/google-chrome/**',
+					'.config/BraveSoftware/**',
+					'.mozilla/**',
+					'.pki/**',
 					'/run/**',
 					'/tmp/**',
 					'/etc/machine-id',
@@ -1118,22 +1150,71 @@ class Installer:
 			'extra_paths': [{'source': '/etc/skel', 'destination': '/etc/skel'}],
 		}
 
-		if hasattr(self, '_install_from_iso_config_cache'):
-			return self._install_from_iso_config_cache  # type: ignore[attr-defined]
+		if mode == 'configs_cache':
+			# More permissive: include browser and session caches/configs while still skipping machine IDs and known profile managers.
+			cache_exclude = [
+				'.local/share/zinit/**',
+				'.local/share/Trash/**',
+				'.local/share/recently-used*',
+				'.local/share/gvfs-metadata/**',
+				'.zcompdump*',
+				'.dbus/**',
+				'.Xauthority',
+				'.ICEauthority',
+				'/run/**',
+				'/tmp/**',
+				'/etc/machine-id',
+				'/var/lib/dbus/machine-id',
+				'/var/lib/systemd/random-seed',
+				'/var/lib/NetworkManager/**',
+				'/var/lib/pacman/local/**',
+			]
 
-		path = self._install_from_iso_config_path()
+			cache_include = base['user_home']['include'] + [
+				'.cache/**',
+				'.config/pulse/**',
+				'.config/chromium/**',
+				'.config/google-chrome/**',
+				'.config/BraveSoftware/**',
+				'.mozilla/**',
+				'.pki/**',
+				'.local/share/flatpak/**',
+				'.local/share/containers/**',
+				'.local/share/keyrings/**',
+			]
+
+			cache_config = {
+				'root_home': {'include': cache_include, 'exclude': cache_exclude},
+				'user_home': {'include': cache_include, 'exclude': cache_exclude},
+				'extra_paths': [{'source': '/etc/skel', 'destination': '/etc/skel'}],
+			}
+			return cache_config
+
+		return base
+
+	def _load_install_from_iso_config(self, mode: str = 'configs') -> dict[str, Any]:
+		if not hasattr(self, '_install_from_iso_config_cache'):
+			self._install_from_iso_config_cache = {}  # type: ignore[attr-defined]
+
+		cache: dict[str, dict[str, Any]] = self._install_from_iso_config_cache  # type: ignore[assignment]
+
+		if mode in cache:
+			return cache[mode]
+
+		default = self._default_install_from_iso_config(mode)
+		path = self._install_from_iso_config_path(mode)
 
 		if not path.exists():
-			self._install_from_iso_config_cache = default  # type: ignore[attr-defined]
+			cache[mode] = default
 			return default
 
 		try:
 			cfg = json.loads(path.read_text())
-			self._install_from_iso_config_cache = cfg  # type: ignore[attr-defined]
+			cache[mode] = cfg
 			return cfg
 		except Exception as err:
-			warn(f'Failed to read install_from_iso config, using defaults: {err}')
-			self._install_from_iso_config_cache = default  # type: ignore[attr-defined]
+			warn(f'Failed to read install_from_iso config for mode {mode}, using defaults: {err}')
+			cache[mode] = default
 			return default
 
 	def _confirm_step(self, choice_key: str, actions: str) -> bool:

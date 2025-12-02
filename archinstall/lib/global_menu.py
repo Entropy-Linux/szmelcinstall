@@ -305,7 +305,9 @@ class GlobalMenu(AbstractMenu[None]):
 	def _prev_entropy_tweaks(self, item: MenuItem) -> str | None:
 		flags = []
 		if self._arch_config.install_from_iso:
-			flags.append(tr('Install from ISO'))
+			mode = getattr(self._arch_config, 'install_from_iso_mode', 'configs')
+			label = tr('Configs + Live Cache') if mode == 'configs_cache' else tr('Configs')
+			flags.append(f"{tr('Install from ISO')}: {label}")
 		if self._arch_config.szmelc_aur:
 			flags.append('Szmelc AUR')
 		return ', '.join(flags) if flags else tr('No tweaks enabled')

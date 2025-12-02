@@ -77,6 +77,7 @@ class ArchConfig:
 	services: list[str] = field(default_factory=list)
 	custom_commands: list[str] = field(default_factory=list)
 	install_from_iso: bool = False
+	install_from_iso_mode: str = 'configs'
 	szmelc_aur: bool = True
 	install_yay: bool = True
 	chaotic_aur: bool = True
@@ -115,6 +116,7 @@ class ArchConfig:
 			'services': self.services,
 			'custom_commands': self.custom_commands,
 			'install_from_iso': self.install_from_iso,
+			'install_from_iso_mode': self.install_from_iso_mode,
 			'szmelc_aur': self.szmelc_aur,
 			'install_yay': self.install_yay,
 			'chaotic_aur': self.chaotic_aur,
@@ -231,6 +233,8 @@ class ArchConfig:
 
 		if 'install_from_iso' in args_config:
 			arch_config.install_from_iso = bool(args_config['install_from_iso'])
+		if 'install_from_iso_mode' in args_config:
+			arch_config.install_from_iso_mode = str(args_config['install_from_iso_mode'])
 
 		if 'szmelc_aur' in args_config:
 			arch_config.szmelc_aur = bool(args_config['szmelc_aur'])
