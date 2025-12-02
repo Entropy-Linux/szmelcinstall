@@ -922,7 +922,7 @@ class Installer:
 		except SysCallError as err:
 			warn(f'Failed to update ownership for /home/{primary_user.username}: {err}')
 
-	def add_live_iso_packages(self) -> list[str]:
+	def add_live_iso_packages(self, exclude_packages: set[str] | None = None) -> list[str]:
 		try:
 			package_lines = Pacman.run('-Qq').decode(strip=False).splitlines()
 		except SysCallError as err:
@@ -946,6 +946,9 @@ class Installer:
 
 		if invalid:
 			debug(f'Skipping {len(invalid)} invalid package names from live ISO: {invalid[:5]}')
+
+		if exclude_packages:
+			packages.difference_update(exclude_packages)
 
 		# Avoid known conflicts with pipewire-jack that the desktop profile installs later.
 		conflict_packages = {'jack', 'jack2'}
@@ -971,8 +974,13 @@ class Installer:
 
 		cfg = self._load_install_from_iso_config()
 
+		gui_pkgs = self._get_gui_packages()
+		exclude_live_pkgs: set[str] = set()
+		if not getattr(config, 'iso_copy_desktop', False):
+			exclude_live_pkgs.update(gui_pkgs)
+
 		# Always install live ISO packages first to avoid file conflicts with /etc/skel.
-		self.add_live_iso_packages()
+		self.add_live_iso_packages(exclude_packages=exclude_live_pkgs if exclude_live_pkgs else None)
 
 		selected_groups = []
 		if getattr(config, 'iso_copy_configs', False):
@@ -1311,6 +1319,10 @@ class Installer:
 		gui_patterns: list[str] = []
 		for pkg in gui_pkgs:
 			gui_patterns.extend(self._resolve_package_paths(pkg, pkg_map))
+			gui_patterns.append(f'.config/{pkg}/**')
+			gui_patterns.append(f'.cache/{pkg}/**')
+			gui_patterns.append(f'.local/share/{pkg}/**')
+			gui_patterns.append(f'.local/state/{pkg}/**')
 		gui_patterns.extend(all_desktop_patterns)
 
 		# Rule: desktop disabled overrides GUI content (configs and caches)
@@ -1322,7 +1334,7 @@ class Installer:
 		# Cache-only should avoid configs/desktop content
 		cache_only = cache_enabled and not config_enabled and not desktop_enabled
 		if cache_only:
-			for pat in all_config_patterns + all_desktop_patterns:
+			for pat in all_config_patterns + all_desktop_patterns + gui_patterns:
 				if pat not in excludes:
 					excludes.append(pat)
 

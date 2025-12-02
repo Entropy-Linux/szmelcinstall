@@ -1,6 +1,6 @@
 # SzmelcInstall
 > ### *Archinstall fork for Entropy Linux*
-> ## Version: 12.1
+> ## Version: 12.2
 
 ---
 
