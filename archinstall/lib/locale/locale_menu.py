@@ -1,14 +1,12 @@
 from typing import override
 
+from archinstall.lib.locale.utils import list_console_fonts, list_keyboard_languages, list_locales, set_kb_layout
+from archinstall.lib.menu.abstract_menu import AbstractSubMenu
+from archinstall.lib.menu.helpers import Selection
+from archinstall.lib.models.locale import LocaleConfiguration
 from archinstall.lib.translationhandler import tr
-from archinstall.tui.curses_menu import SelectMenu
 from archinstall.tui.menu_item import MenuItem, MenuItemGroup
 from archinstall.tui.result import ResultType
-from archinstall.tui.types import Alignment, FrameProperties
-
-from ..menu.abstract_menu import AbstractSubMenu
-from ..models.locale import LocaleConfiguration
-from .utils import list_keyboard_languages, list_locales, set_kb_layout
 
 
 class LocaleMenu(AbstractSubMenu[LocaleConfiguration]):
@@ -17,9 +15,9 @@ class LocaleMenu(AbstractSubMenu[LocaleConfiguration]):
 		locale_conf: LocaleConfiguration,
 	):
 		self._locale_conf = locale_conf
-		menu_optioons = self._define_menu_options()
+		menu_options = self._define_menu_options()
 
-		self._item_group = MenuItemGroup(menu_optioons, sort_items=False, checkmarks=True)
+		self._item_group = MenuItemGroup(menu_options, sort_items=False, checkmarks=True)
 		super().__init__(
 			self._item_group,
 			config=self._locale_conf,
@@ -32,62 +30,61 @@ class LocaleMenu(AbstractSubMenu[LocaleConfiguration]):
 				text=tr('Keyboard layout'),
 				action=self._select_kb_layout,
 				value=self._locale_conf.kb_layout,
-				preview_action=self._prev_locale,
+				preview_action=lambda item: item.get_value(),
 				key='kb_layout',
 			),
 			MenuItem(
 				text=tr('Locale language'),
 				action=select_locale_lang,
 				value=self._locale_conf.sys_lang,
-				preview_action=self._prev_locale,
+				preview_action=lambda item: item.get_value(),
 				key='sys_lang',
 			),
 			MenuItem(
 				text=tr('Locale encoding'),
 				action=select_locale_enc,
 				value=self._locale_conf.sys_enc,
-				preview_action=self._prev_locale,
+				preview_action=lambda item: item.get_value(),
 				key='sys_enc',
+			),
+			MenuItem(
+				text=tr('Console font'),
+				action=select_console_font,
+				value=self._locale_conf.console_font,
+				preview_action=lambda item: item.get_value(),
+				key='console_font',
 			),
 		]
 
-	def _prev_locale(self, item: MenuItem) -> str:
-		temp_locale = LocaleConfiguration(
-			self._menu_item_group.find_by_key('kb_layout').get_value(),
-			self._menu_item_group.find_by_key('sys_lang').get_value(),
-			self._menu_item_group.find_by_key('sys_enc').get_value(),
-		)
-		return temp_locale.preview()
-
 	@override
-	def run(
-		self,
-		additional_title: str | None = None,
-	) -> LocaleConfiguration:
-		super().run(additional_title=additional_title)
-		return self._locale_conf
+	async def show(self) -> LocaleConfiguration | None:
+		config = await super().show()
 
-	def _select_kb_layout(self, preset: str | None) -> str | None:
-		kb_lang = select_kb_layout(preset)
+		if config is None:
+			config = LocaleConfiguration.default()
+
+		return config
+
+	async def _select_kb_layout(self, preset: str | None) -> str | None:
+		kb_lang = await select_kb_layout(preset)
 		if kb_lang:
 			set_kb_layout(kb_lang)
 		return kb_lang
 
 
-def select_locale_lang(preset: str | None = None) -> str | None:
+async def select_locale_lang(preset: str | None = None) -> str | None:
 	locales = list_locales()
-	locale_lang = set([locale.split()[0] for locale in locales])
+	locale_lang = {locale.split()[0] for locale in locales}
 
 	items = [MenuItem(ll, value=ll) for ll in locale_lang]
 	group = MenuItemGroup(items, sort_items=True)
 	group.set_focus_by_value(preset)
 
-	result = SelectMenu[str](
-		group,
-		alignment=Alignment.CENTER,
-		frame=FrameProperties.min(tr('Locale language')),
-		allow_skip=True,
-	).run()
+	result = await Selection[str](
+		header=tr('Locale language'),
+		group=group,
+		enable_filter=True,
+	).show()
 
 	match result.type_:
 		case ResultType.Selection:
@@ -98,20 +95,19 @@ def select_locale_lang(preset: str | None = None) -> str | None:
 			raise ValueError('Unhandled return type')
 
 
-def select_locale_enc(preset: str | None = None) -> str | None:
+async def select_locale_enc(preset: str | None = None) -> str | None:
 	locales = list_locales()
-	locale_enc = set([locale.split()[1] for locale in locales])
+	locale_enc = {locale.split()[1] for locale in locales}
 
 	items = [MenuItem(le, value=le) for le in locale_enc]
 	group = MenuItemGroup(items, sort_items=True)
 	group.set_focus_by_value(preset)
 
-	result = SelectMenu[str](
-		group,
-		alignment=Alignment.CENTER,
-		frame=FrameProperties.min(tr('Locale encoding')),
-		allow_skip=True,
-	).run()
+	result = await Selection[str](
+		header=tr('Locale encoding'),
+		group=group,
+		enable_filter=True,
+	).show()
 
 	match result.type_:
 		case ResultType.Selection:
@@ -122,7 +118,7 @@ def select_locale_enc(preset: str | None = None) -> str | None:
 			raise ValueError('Unhandled return type')
 
 
-def select_kb_layout(preset: str | None = None) -> str | None:
+async def select_kb_layout(preset: str | None = None) -> str | None:
 	"""
 	Select keyboard layout
 
@@ -138,12 +134,33 @@ def select_kb_layout(preset: str | None = None) -> str | None:
 	group = MenuItemGroup(items, sort_items=False)
 	group.set_focus_by_value(preset)
 
-	result = SelectMenu[str](
-		group,
-		alignment=Alignment.CENTER,
-		frame=FrameProperties.min(tr('Keyboard layout')),
-		allow_skip=True,
-	).run()
+	result = await Selection[str](
+		header=tr('Keyboard layout'),
+		group=group,
+		enable_filter=True,
+	).show()
+
+	match result.type_:
+		case ResultType.Selection:
+			return result.get_value()
+		case ResultType.Skip:
+			return preset
+		case _:
+			raise ValueError('Unhandled return type')
+
+
+async def select_console_font(preset: str | None = None) -> str | None:
+	fonts = list_console_fonts()
+
+	items = [MenuItem(f, value=f) for f in fonts]
+	group = MenuItemGroup(items, sort_items=False)
+	group.set_focus_by_value(preset)
+
+	result = await Selection[str](
+		header=tr('Console font'),
+		group=group,
+		enable_filter=True,
+	).show()
 
 	match result.type_:
 		case ResultType.Selection:

@@ -1,15 +1,20 @@
-from __future__ import annotations
-
 import math
 import time
 from pathlib import Path
 
-from archinstall.lib.translationhandler import tr
-from archinstall.tui.curses_menu import Tui
-
-from ..interactions.general_conf import ask_abort
-from ..luks import Luks2
-from ..models.device import (
+from archinstall.lib.disk.device_handler import device_handler
+from archinstall.lib.disk.luks import Luks2
+from archinstall.lib.disk.lvm import (
+	lvm_group_info,
+	lvm_pv_create,
+	lvm_vg_create,
+	lvm_vol_create,
+	lvm_vol_info,
+	lvm_vol_reduce,
+)
+from archinstall.lib.disk.utils import udev_sync
+from archinstall.lib.log import debug, info
+from archinstall.lib.models.device import (
 	DiskEncryption,
 	DiskLayoutConfiguration,
 	DiskLayoutType,
@@ -23,8 +28,6 @@ from ..models.device import (
 	Size,
 	Unit,
 )
-from ..output import debug, info
-from .device_handler import device_handler
 
 
 class FilesystemHandler:
@@ -32,7 +35,7 @@ class FilesystemHandler:
 		self._disk_config = disk_config
 		self._enc_config = disk_config.disk_encryption
 
-	def perform_filesystem_operations(self, show_countdown: bool = True) -> None:
+	def perform_filesystem_operations(self) -> None:
 		if self._disk_config.config_type == DiskLayoutType.Pre_mount:
 			debug('Disk layout configuration is set to pre-mount, not performing any operations')
 			return
@@ -42,9 +45,6 @@ class FilesystemHandler:
 		if not device_mods:
 			debug('No modifications required')
 			return
-
-		if show_countdown:
-			self._final_warning()
 
 		# Setup the blockdevice, filesystem (and optionally encryption).
 		# Once that's done, we'll hand over to perform_installation()
@@ -56,7 +56,7 @@ class FilesystemHandler:
 		for mod in device_mods:
 			device_handler.partition(mod)
 
-		device_handler.udev_sync()
+		udev_sync()
 
 		if self._disk_config.lvm_config:
 			for mod in device_mods:
@@ -70,7 +70,7 @@ class FilesystemHandler:
 				self._format_partitions(mod.partitions)
 
 				for part_mod in mod.partitions:
-					if part_mod.fs_type == FilesystemType.Btrfs and part_mod.is_create_or_modify():
+					if part_mod.fs_type == FilesystemType.BTRFS and part_mod.is_create_or_modify():
 						device_handler.create_btrfs_volumes(part_mod, enc_conf=self._enc_config)
 
 	def _format_partitions(
@@ -100,7 +100,7 @@ class FilesystemHandler:
 				device_handler.format(part_mod.safe_fs_type, part_mod.safe_dev_path)
 
 			# synchronize with udev before using lsblk
-			device_handler.udev_sync()
+			udev_sync()
 
 			lsblk_info = device_handler.fetch_part_info(part_mod.safe_dev_path)
 
@@ -113,7 +113,7 @@ class FilesystemHandler:
 			# verify that all partitions have a path set (which implies that they have been created)
 			lambda x: x.dev_path is None: ValueError('When formatting, all partitions must have a path set'),
 			# crypto luks is not a valid file system type
-			lambda x: x.fs_type is FilesystemType.Crypto_luks: ValueError('Crypto luks cannot be set as a filesystem type'),
+			lambda x: x.fs_type is FilesystemType.CRYPTO_LUKS: ValueError('Crypto luks cannot be set as a filesystem type'),
 			# file system type must be set
 			lambda x: x.fs_type is None: ValueError('File system type must be set for modification'),
 		}
@@ -139,48 +139,39 @@ class FilesystemHandler:
 			self._format_lvm_vols(self._disk_config.lvm_config)
 
 	def _setup_lvm_encrypted(self, lvm_config: LvmConfiguration, enc_config: DiskEncryption) -> None:
-		if enc_config.encryption_type == EncryptionType.LvmOnLuks:
+		if enc_config.encryption_type == EncryptionType.LVM_ON_LUKS:
 			enc_mods = self._encrypt_partitions(enc_config, lock_after_create=False)
 
 			self._setup_lvm(lvm_config, enc_mods)
 			self._format_lvm_vols(lvm_config)
 
-			# export the lvm group safely otherwise the Luks cannot be closed
-			self._safely_close_lvm(lvm_config)
-
-			for luks in enc_mods.values():
-				luks.lock()
-		elif enc_config.encryption_type == EncryptionType.LuksOnLvm:
+			# Don't close LVM or LUKS during setup - keep everything active
+			# The installation phase will handle unlocking and mounting
+			# Closing causes "parent leaked" and lvchange errors
+		elif enc_config.encryption_type == EncryptionType.LUKS_ON_LVM:
 			self._setup_lvm(lvm_config)
 			enc_vols = self._encrypt_lvm_vols(lvm_config, enc_config, False)
 			self._format_lvm_vols(lvm_config, enc_vols)
 
+			# Lock LUKS devices but keep LVM active
+			# LVM volumes must remain active for later re-unlock during installation
 			for luks in enc_vols.values():
 				luks.lock()
-
-			self._safely_close_lvm(lvm_config)
-
-	def _safely_close_lvm(self, lvm_config: LvmConfiguration) -> None:
-		for vg in lvm_config.vol_groups:
-			for vol in vg.volumes:
-				device_handler.lvm_vol_change(vol, False)
-
-			device_handler.lvm_export_vg(vg)
 
 	def _setup_lvm(
 		self,
 		lvm_config: LvmConfiguration,
-		enc_mods: dict[PartitionModification, Luks2] = {},
+		enc_mods: dict[PartitionModification, Luks2] | None = None,
 	) -> None:
 		self._lvm_create_pvs(lvm_config, enc_mods)
 
 		for vg in lvm_config.vol_groups:
 			pv_dev_paths = self._get_all_pv_dev_paths(vg.pvs, enc_mods)
 
-			device_handler.lvm_vg_create(pv_dev_paths, vg.name)
+			lvm_vg_create(pv_dev_paths, vg.name)
 
 			# figure out what the actual available size in the group is
-			vg_info = device_handler.lvm_group_info(vg.name)
+			vg_info = lvm_group_info(vg.name)
 
 			if not vg_info:
 				raise ValueError('Unable to fetch VG info')
@@ -191,7 +182,7 @@ class FilesystemHandler:
 			# to the desired sizes and subtract some equally from the actually
 			# created volume
 			avail_size = vg_info.vg_size
-			desired_size = sum([vol.length for vol in vg.volumes], Size(0, Unit.B, SectorSize.default()))
+			desired_size = sum((vol.length for vol in vg.volumes), Size(0, Unit.B, SectorSize.default()))
 
 			delta = desired_size - avail_size
 			delta_bytes = delta.convert(Unit.B)
@@ -210,11 +201,11 @@ class FilesystemHandler:
 				offset = max_vol_offset if lv == max_vol else None
 
 				debug(f'vg: {vg.name}, vol: {lv.name}, offset: {offset}')
-				device_handler.lvm_vol_create(vg.name, lv, offset)
+				lvm_vol_create(vg.name, lv, offset)
 
 				while True:
 					debug('Fetching LVM volume info')
-					lv_info = device_handler.lvm_vol_info(lv.name)
+					lv_info = lvm_vol_info(lv.name)
 					if lv_info is not None:
 						break
 
@@ -225,10 +216,10 @@ class FilesystemHandler:
 	def _format_lvm_vols(
 		self,
 		lvm_config: LvmConfiguration,
-		enc_vols: dict[LvmVolume, Luks2] = {},
+		enc_vols: dict[LvmVolume, Luks2] | None = None,
 	) -> None:
 		for vol in lvm_config.get_all_volumes():
-			if enc_vol := enc_vols.get(vol, None):
+			if enc_vols is not None and (enc_vol := enc_vols.get(vol, None)):
 				if not enc_vol.mapper_dev:
 					raise ValueError('No mapper device defined')
 				path = enc_vol.mapper_dev
@@ -239,30 +230,30 @@ class FilesystemHandler:
 			# find the mapper device yet
 			device_handler.format(vol.fs_type, path)
 
-			if vol.fs_type == FilesystemType.Btrfs:
+			if vol.fs_type == FilesystemType.BTRFS:
 				device_handler.create_lvm_btrfs_subvolumes(path, vol.btrfs_subvols, vol.mount_options)
 
 	def _lvm_create_pvs(
 		self,
 		lvm_config: LvmConfiguration,
-		enc_mods: dict[PartitionModification, Luks2] = {},
+		enc_mods: dict[PartitionModification, Luks2] | None = None,
 	) -> None:
 		pv_paths: set[Path] = set()
 
 		for vg in lvm_config.vol_groups:
 			pv_paths |= self._get_all_pv_dev_paths(vg.pvs, enc_mods)
 
-		device_handler.lvm_pv_create(pv_paths)
+		lvm_pv_create(pv_paths)
 
 	def _get_all_pv_dev_paths(
 		self,
 		pvs: list[PartitionModification],
-		enc_mods: dict[PartitionModification, Luks2] = {},
+		enc_mods: dict[PartitionModification, Luks2] | None = None,
 	) -> set[Path]:
 		pv_paths: set[Path] = set()
 
 		for pv in pvs:
-			if enc_pv := enc_mods.get(pv, None):
+			if enc_mods is not None and (enc_pv := enc_mods.get(pv, None)):
 				if mapper := enc_pv.mapper_dev:
 					pv_paths.add(mapper)
 			else:
@@ -327,27 +318,10 @@ class FilesystemHandler:
 		# from arch wiki:
 		# If a logical volume will be formatted with ext4, leave at least 256 MiB
 		# free space in the volume group to allow using e2scrub
-		if any([vol.fs_type == FilesystemType.Ext4 for vol in vol_gp.volumes]):
+		if any(vol.fs_type == FilesystemType.EXT4 for vol in vol_gp.volumes):
 			largest_vol = max(vol_gp.volumes, key=lambda x: x.length)
 
-			device_handler.lvm_vol_reduce(
+			lvm_vol_reduce(
 				largest_vol.safe_dev_path,
 				Size(256, Unit.MiB, SectorSize.default()),
 			)
-
-	def _final_warning(self) -> bool:
-		# Issue a final warning before we continue with something un-revertable.
-		# We mention the drive one last time, and count from 5 to 0.
-		out = tr('Starting device modifications in ')
-		Tui.print(out, row=0, endl='', clear_screen=True)
-
-		try:
-			countdown = '\n5...4...3...2...1\n'
-			for c in countdown:
-				Tui.print(c, row=0, endl='')
-				time.sleep(0.25)
-		except KeyboardInterrupt:
-			with Tui():
-				ask_abort()
-
-		return True

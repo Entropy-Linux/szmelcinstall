@@ -1,19 +1,15 @@
-from __future__ import annotations
-
 from collections.abc import Callable
 
-from archinstall.lib.output import warn
-from archinstall.lib.pacman import Pacman
+from archinstall.lib.entropy.catalog import EntropyComponent, load_asset_packs, load_config_packs, load_kits
+from archinstall.lib.log import warn
+from archinstall.lib.menu.helpers import Selection
+from archinstall.lib.pacman.pacman import Pacman
 from archinstall.lib.translationhandler import tr
-from archinstall.tui.curses_menu import SelectMenu
 from archinstall.tui.menu_item import MenuItem, MenuItemGroup
 from archinstall.tui.result import ResultType
-from archinstall.tui.types import FrameProperties, PreviewStyle
-
-from .catalog import EntropyComponent, load_asset_packs, load_config_packs, load_kits
 
 
-def _component_menu(
+async def _component_menu(
 	loader: Callable[[], list[EntropyComponent]],
 	current: list[str],
 	title: str,
@@ -25,7 +21,8 @@ def _component_menu(
 
 	items = []
 	for comp in components:
-		def _preview(item: MenuItem, c: EntropyComponent = comp) -> str | None:  # noqa: B023
+
+		def _preview(item: MenuItem, c: EntropyComponent = comp) -> str | None:
 			lines = []
 			if c.description:
 				lines.append(c.description)
@@ -38,37 +35,34 @@ def _component_menu(
 	group = MenuItemGroup(items, checkmarks=True, sort_items=True, sort_case_sensitive=False)
 	group.set_selected_by_value(current)
 
-	result = SelectMenu[str](
+	result = await Selection[str](
 		group,
-		multi=True,
-		allow_skip=True,
-		preview_style=PreviewStyle.RIGHT,
-		preview_size='auto',
-		preview_frame=FrameProperties.max(tr('Info')),
 		header=title,
-	).run()
+		allow_skip=True,
+		allow_reset=True,
+		multi=True,
+		preview_location='right',
+	).show()
 
 	match result.type_:
 		case ResultType.Skip:
 			return current
-		case ResultType.Selection:
-			return result.get_values()
 		case ResultType.Reset:
 			return []
-
-	return current
-
-
-def select_kits(current: list[str]) -> list[str]:
-	return _component_menu(load_kits, current, tr('Entropy Kits'))
+		case ResultType.Selection:
+			return result.get_values()
 
 
-def select_config_packs(current: list[str]) -> list[str]:
-	return _component_menu(load_config_packs, current, tr('Szmelc Config Packs'))
+async def select_kits(current: list[str]) -> list[str]:
+	return await _component_menu(load_kits, current, tr('Entropy Kits'))
 
 
-def select_asset_packs(current: list[str]) -> list[str]:
-	return _component_menu(load_asset_packs, current, tr('Szmelc Asset Packs'))
+async def select_config_packs(current: list[str]) -> list[str]:
+	return await _component_menu(load_config_packs, current, tr('Szmelc Config Packs'))
+
+
+async def select_asset_packs(current: list[str]) -> list[str]:
+	return await _component_menu(load_asset_packs, current, tr('Szmelc Asset Packs'))
 
 
 def list_szmelc_packages() -> list[str]:
@@ -87,7 +81,7 @@ def list_szmelc_packages() -> list[str]:
 	return sorted(packages)
 
 
-def select_szmelc_packages(current: list[str]) -> list[str]:
+async def select_szmelc_packages(current: list[str]) -> list[str]:
 	packages = list_szmelc_packages()
 	if not packages:
 		warn(tr('No Szmelc packages available'))
@@ -97,21 +91,19 @@ def select_szmelc_packages(current: list[str]) -> list[str]:
 	group = MenuItemGroup(items, checkmarks=True, sort_items=True, sort_case_sensitive=False)
 	group.set_selected_by_value(current)
 
-	result = SelectMenu[str](
+	result = await Selection[str](
 		group,
-		multi=True,
-		allow_skip=True,
 		header=tr('Szmelc packages'),
-		preview_style=PreviewStyle.NONE,
-		preview_size='auto',
-	).run()
+		allow_skip=True,
+		allow_reset=True,
+		multi=True,
+		enable_filter=True,
+	).show()
 
 	match result.type_:
 		case ResultType.Skip:
 			return current
-		case ResultType.Selection:
-			return result.get_values()
 		case ResultType.Reset:
 			return []
-
-	return current
+		case ResultType.Selection:
+			return result.get_values()

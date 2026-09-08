@@ -1,9 +1,9 @@
 # Maintainer: sx66 <serainox@gmail.com>
 # For Entropy Linux
-# Forked from upstream archinstall PKGBUILD
+# Forked from upstream archinstall PKGBUILD (rebased onto archinstall 4.4)
 
 pkgname=archinstall-entropy
-pkgver=12
+pkgver=13
 pkgrel=1
 pkgdesc="Entropy Linux installer (archinstall fork) with Entropy/Szmelc customizations"
 arch=(any)
@@ -27,12 +27,14 @@ depends=(
   'python-pydantic'
   'python-pyparted'
   'python-textual'
+  'python-markdown-it-py'
+  'python-linkify-it-py'
   'systemd'
   'util-linux'
   'xfsprogs'
   'lvm2'
   'f2fs-tools'
-  'ntfs-3g'
+  'libfido2'
 )
 makedepends=(
   'python-build'
@@ -42,6 +44,7 @@ makedepends=(
   'python-wheel'
   'python-sphinx_rtd_theme'
   'python-pylint'
+  'python-pylint-pydantic'
   'ruff'
 )
 optdepends=(
@@ -63,9 +66,8 @@ check() {
   return 0
 
   # Original check() kept below for reference (never executed):
-  # cd "$srcdir/szmelcinstall-main"
-  # python -m ruff check archinstall || true
-  # pytest || true
+  # cd "$_srcdir"
+  # ruff check
 }
 
 build() {

@@ -1,38 +1,31 @@
 import os
-from enum import Enum
+from dataclasses import dataclass
+from enum import Enum, StrEnum
 from functools import cached_property
 from pathlib import Path
 
-from .exceptions import SysCallError
-from .general import SysCommand
-from .networking import enrich_iface_types, list_interfaces
-from .output import debug
-from .translationhandler import tr
+from archinstall.lib.command import SysCommand
+from archinstall.lib.exceptions import SysCallError
+from archinstall.lib.log import debug
+from archinstall.lib.networking import enrich_iface_types, list_interfaces
+from archinstall.lib.translationhandler import tr
 
 
-class CpuVendor(Enum):
-	AuthenticAMD = 'amd'
-	GenuineIntel = 'intel'
-	_Unknown = 'unknown'
-
-	@classmethod
-	def get_vendor(cls, name: str) -> 'CpuVendor':
-		if vendor := getattr(cls, name, None):
-			return vendor
-		else:
-			debug(f"Unknown CPU vendor '{name}' detected.")
-			return cls._Unknown
+class CPUVendor(StrEnum):
+	AMD = 'AuthenticAMD'
+	INTEL = 'GenuineIntel'
+	_UNKNOWN = 'unknown'
 
 	def _has_microcode(self) -> bool:
 		match self:
-			case CpuVendor.AuthenticAMD | CpuVendor.GenuineIntel:
+			case CPUVendor.AMD | CPUVendor.INTEL:
 				return True
 			case _:
 				return False
 
 	def get_ucode(self) -> Path | None:
 		if self._has_microcode():
-			return Path(self.value + '-ucode.img')
+			return Path(self.name.lower() + '-ucode.img')
 		return None
 
 
@@ -40,10 +33,11 @@ class GfxPackage(Enum):
 	Dkms = 'dkms'
 	IntelMediaDriver = 'intel-media-driver'
 	LibvaIntelDriver = 'libva-intel-driver'
-	LibvaMesaDriver = 'libva-mesa-driver'
+	VplGpuRt = 'vpl-gpu-rt'
+	LibVpl = 'libvpl'
 	LibvaNvidiaDriver = 'libva-nvidia-driver'
 	Mesa = 'mesa'
-	NvidiaDkms = 'nvidia-dkms'
+	NvidiaOpen = 'nvidia-open'
 	NvidiaOpenDkms = 'nvidia-open-dkms'
 	VulkanIntel = 'vulkan-intel'
 	VulkanRadeon = 'vulkan-radeon'
@@ -51,8 +45,6 @@ class GfxPackage(Enum):
 	Xf86VideoAmdgpu = 'xf86-video-amdgpu'
 	Xf86VideoAti = 'xf86-video-ati'
 	Xf86VideoNouveau = 'xf86-video-nouveau'
-	XorgServer = 'xorg-server'
-	XorgXinit = 'xorg-xinit'
 
 
 class GfxDriver(Enum):
@@ -61,12 +53,24 @@ class GfxDriver(Enum):
 	IntelOpenSource = 'Intel (open-source)'
 	NvidiaOpenKernel = 'Nvidia (open kernel module for newer GPUs, Turing+)'
 	NvidiaOpenSource = 'Nvidia (open-source nouveau driver)'
-	NvidiaProprietary = 'Nvidia (proprietary)'
 	VMOpenSource = 'VirtualBox (open-source)'
 
 	def is_nvidia(self) -> bool:
 		match self:
-			case GfxDriver.NvidiaProprietary | GfxDriver.NvidiaOpenSource | GfxDriver.NvidiaOpenKernel:
+			case GfxDriver.NvidiaOpenSource | GfxDriver.NvidiaOpenKernel:
+				return True
+			case _:
+				return False
+
+	def is_nvidia_proprietary(self) -> bool:
+		"""
+		True for Nvidia drivers that ship proprietary userspace components.
+		Currently only NvidiaOpenKernel (nvidia-open-dkms): open kernel module
+		paired with proprietary userspace. NvidiaOpenSource (nouveau) is fully
+		open and works with Sway, so it is excluded.
+		"""
+		match self:
+			case GfxDriver.NvidiaOpenKernel:
 				return True
 			case _:
 				return False
@@ -76,12 +80,12 @@ class GfxDriver(Enum):
 		text = tr('Installed packages') + ':\n'
 
 		for p in sorted(pkg_names):
-			text += f'\t- {p}\n'
+			text += f'    - {p}\n'
 
 		return text
 
 	def gfx_packages(self) -> list[GfxPackage]:
-		packages = [GfxPackage.XorgServer, GfxPackage.XorgXinit]
+		packages: list[GfxPackage] = []
 
 		match self:
 			case GfxDriver.AllOpenSource:
@@ -90,9 +94,10 @@ class GfxDriver(Enum):
 					GfxPackage.Xf86VideoAmdgpu,
 					GfxPackage.Xf86VideoAti,
 					GfxPackage.Xf86VideoNouveau,
-					GfxPackage.LibvaMesaDriver,
 					GfxPackage.LibvaIntelDriver,
 					GfxPackage.IntelMediaDriver,
+					GfxPackage.VplGpuRt,
+					GfxPackage.LibVpl,
 					GfxPackage.VulkanRadeon,
 					GfxPackage.VulkanIntel,
 					GfxPackage.VulkanNouveau,
@@ -102,7 +107,6 @@ class GfxDriver(Enum):
 					GfxPackage.Mesa,
 					GfxPackage.Xf86VideoAmdgpu,
 					GfxPackage.Xf86VideoAti,
-					GfxPackage.LibvaMesaDriver,
 					GfxPackage.VulkanRadeon,
 				]
 			case GfxDriver.IntelOpenSource:
@@ -110,6 +114,8 @@ class GfxDriver(Enum):
 					GfxPackage.Mesa,
 					GfxPackage.LibvaIntelDriver,
 					GfxPackage.IntelMediaDriver,
+					GfxPackage.VplGpuRt,
+					GfxPackage.LibVpl,
 					GfxPackage.VulkanIntel,
 				]
 			case GfxDriver.NvidiaOpenKernel:
@@ -122,14 +128,7 @@ class GfxDriver(Enum):
 				packages += [
 					GfxPackage.Mesa,
 					GfxPackage.Xf86VideoNouveau,
-					GfxPackage.LibvaMesaDriver,
 					GfxPackage.VulkanNouveau,
-				]
-			case GfxDriver.NvidiaProprietary:
-				packages += [
-					GfxPackage.NvidiaDkms,
-					GfxPackage.Dkms,
-					GfxPackage.LibvaNvidiaDriver,
 				]
 			case GfxDriver.VMOpenSource:
 				packages += [
@@ -142,6 +141,18 @@ class GfxDriver(Enum):
 class _SysInfo:
 	def __init__(self) -> None:
 		pass
+
+	@cached_property
+	def has_battery(self) -> bool:
+		for type_path in Path('/sys/class/power_supply/').glob('*/type'):
+			try:
+				with open(type_path) as f:
+					if f.read().strip() == 'Battery':
+						return True
+			except OSError:
+				continue
+
+		return False
 
 	@cached_property
 	def cpu_info(self) -> dict[str, str]:
@@ -160,25 +171,6 @@ class _SysInfo:
 		return cpu
 
 	@cached_property
-	def mem_info(self) -> dict[str, int]:
-		"""
-		Returns system memory information
-		"""
-		mem_info_path = Path('/proc/meminfo')
-		mem_info: dict[str, int] = {}
-
-		with mem_info_path.open() as file:
-			for line in file:
-				key, value = line.strip().split(':')
-				num = value.split()[0]
-				mem_info[key] = int(num)
-
-		return mem_info
-
-	def mem_info_by_key(self, key: str) -> int:
-		return self.mem_info[key]
-
-	@cached_property
 	def loaded_modules(self) -> list[str]:
 		"""
 		Returns loaded kernel modules
@@ -193,11 +185,27 @@ class _SysInfo:
 
 		return modules
 
+	@cached_property
+	def graphics_devices(self) -> dict[str, str]:
+		"""
+		Returns detected graphics devices (cached)
+		"""
+		cards: dict[str, str] = {}
+		for line in SysCommand('lspci'):
+			if b' VGA ' in line or b' 3D ' in line:
+				_, identifier = line.split(b': ', 1)
+				cards[identifier.strip().decode('UTF-8')] = str(line)
+		return cards
+
 
 _sys_info = _SysInfo()
 
 
 class SysInfo:
+	@staticmethod
+	def has_battery() -> bool:
+		return _sys_info.has_battery
+
 	@staticmethod
 	def has_wifi() -> bool:
 		ifaces = list(list_interfaces().values())
@@ -209,29 +217,28 @@ class SysInfo:
 
 	@staticmethod
 	def _graphics_devices() -> dict[str, str]:
-		cards: dict[str, str] = {}
-		for line in SysCommand('lspci'):
-			if b' VGA ' in line or b' 3D ' in line:
-				_, identifier = line.split(b': ', 1)
-				cards[identifier.strip().decode('UTF-8')] = str(line)
-		return cards
+		return _sys_info.graphics_devices
 
 	@staticmethod
 	def has_nvidia_graphics() -> bool:
-		return any('nvidia' in x.lower() for x in SysInfo._graphics_devices())
+		return any('nvidia' in x.lower() for x in _sys_info.graphics_devices)
 
 	@staticmethod
 	def has_amd_graphics() -> bool:
-		return any('amd' in x.lower() for x in SysInfo._graphics_devices())
+		return any('amd' in x.lower() for x in _sys_info.graphics_devices)
 
 	@staticmethod
 	def has_intel_graphics() -> bool:
-		return any('intel' in x.lower() for x in SysInfo._graphics_devices())
+		return any('intel' in x.lower() for x in _sys_info.graphics_devices)
 
 	@staticmethod
-	def cpu_vendor() -> CpuVendor | None:
+	def cpu_vendor() -> CPUVendor | None:
 		if vendor := _sys_info.cpu_info.get('vendor_id'):
-			return CpuVendor.get_vendor(vendor)
+			try:
+				return CPUVendor(vendor)
+			except ValueError:
+				debug(f"Unknown CPU vendor '{vendor}' detected.")
+				return CPUVendor._UNKNOWN
 		return None
 
 	@staticmethod
@@ -253,18 +260,6 @@ class SysInfo:
 				return product.read().strip()
 		except FileNotFoundError:
 			return None
-
-	@staticmethod
-	def mem_available() -> int:
-		return _sys_info.mem_info_by_key('MemAvailable')
-
-	@staticmethod
-	def mem_free() -> int:
-		return _sys_info.mem_info_by_key('MemFree')
-
-	@staticmethod
-	def mem_total() -> int:
-		return _sys_info.mem_info_by_key('MemTotal')
 
 	@staticmethod
 	def virtualization() -> str | None:
@@ -321,3 +316,26 @@ class SysInfo:
 				return True
 
 		return False
+
+
+@dataclass(frozen=True)
+class MemInfo:
+	mem_total: int
+	mem_free: int
+	mem_available: int
+
+
+def read_meminfo() -> MemInfo:
+	data: dict[str, int] = {}
+
+	with Path('/proc/meminfo').open() as file:
+		for line in file:
+			key, _, remainder = line.partition(':')
+			num, _, _ = remainder.strip().partition(' ')
+			data[key] = int(num)
+
+	return MemInfo(
+		mem_total=data['MemTotal'],
+		mem_free=data['MemFree'],
+		mem_available=data['MemAvailable'],
+	)

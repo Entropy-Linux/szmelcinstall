@@ -1,10 +1,7 @@
-from __future__ import annotations
-
 from collections.abc import Callable
 
 from archinstall.lib.args import ArchConfig
-
-from .catalog import (
+from archinstall.lib.entropy.catalog import (
 	EntropyComponent,
 	EntropyPayload,
 	build_payload,

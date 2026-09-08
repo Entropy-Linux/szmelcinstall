@@ -4,25 +4,26 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "archinstall"
-version = "3.0.14"
+version = "4.4"
 description = "Arch Linux installer - guided, templates etc."
 authors = [
     {name = "Anton Hvornum", email = "anton@hvornum.se"},
 ]
 license = "GPL-3.0-only"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 keywords = ["linux", "arch", "archinstall", "installer"]
 classifiers = [
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.14",
     "Operating System :: POSIX :: Linux",
 ]
 dependencies = [
     "pyparted>=3.13.0",
-    "pydantic==2.12.5",
-    "cryptography>=45.0.7",
-    "textual>=5.3.0",
-    "pytest-mock>=3.15.1",
+    "pydantic>=2.13.4",
+    "cryptography>=50.0.1",
+    "textual>=8.2.8",
+    "markdown-it-py>=4.2.0",
+    "linkify-it-py>=2.1.0",
 ]
 
 [project.urls]
@@ -31,19 +32,20 @@ Documentation = "https://archinstall.readthedocs.io/"
 Source = "https://github.com/archlinux/archinstall"
 
 [project.optional-dependencies]
-log = ["systemd_python==235"]
+log = ["systemd_python>=236"]
 dev = [
-    "mypy==1.18.2",
-    "flake8==7.3.0",
-    "pre-commit==4.5.0",
-    "ruff==0.14.7",
-    "pylint==4.0.3",
-    "pytest==9.0.1",
+    "mypy>=2.3.0",
+    "flake8>=7.3.0",
+    "pre-commit>=4.6.1",
+    "ruff>=0.16.2",
+    "pylint>=4.0.7",
+    "pytest>=9.1.1",
+    "hypothesis>=6.152.4",
 ]
 doc = ["sphinx"]
 
 [project.scripts]
-archinstall = "archinstall:run_as_a_module"
+archinstall = "archinstall.main:main"
 
 [tool.setuptools.dynamic]
 readme = {file = ["README.rst", "USAGE.rst"]}
@@ -59,15 +61,18 @@ include-package-data = true
     "**/*.po",
     "**/*.pot",
     "**/*.json",
+    "**/*.kdl",
 ]
 
 [tool.setuptools.package-dir]
 archinstall = "archinstall"
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.14"
 files = "."
-exclude = "^build/"
+exclude = [
+    "^build/",
+]
 disallow_any_explicit = false
 disallow_any_expr = false
 disallow_any_unimported = true
@@ -101,16 +106,6 @@ module = "archinstall.lib.*"
 warn_return_any = false
 
 [[tool.mypy.overrides]]
-module = "archinstall.lib.disk.*"
-# 'Any' imports are allowed because pyparted doesn't have type hints
-disallow_any_unimported = false
-
-[[tool.mypy.overrides]]
-module = "archinstall.lib.models.*"
-# 'Any' imports are allowed because pyparted doesn't have type hints
-disallow_any_unimported = false
-
-[[tool.mypy.overrides]]
 module = "archinstall.lib.packages"
 disallow_any_explicit = true
 
@@ -118,28 +113,26 @@ disallow_any_explicit = true
 module = "archinstall.lib.utils"
 disallow_any_explicit = true
 
-[[tool.mypy.overrides]]
-module = [
-    "parted",
-]
-ignore_missing_imports = true
-
 [tool.bandit]
 targets = ["archinstall"]
 exclude = ["/tests"]
 
-[tool.pytest.ini_options]
+[tool.pytest]
 pythonpath = ["."]
-addopts = "-s"
+addopts = [
+    "-s",
+    "--strict",
+]
 testpaths = ["tests"]
 
 [tool.pylint.main]
 ignore-paths = [
     "^build/",
     "^docs/",
+    "^node_modules/",
 ]
 persistent = false
-py-version = "3.12"
+py-version = "3.14"
 recursive = true
 
 [tool.pylint.format]
@@ -152,8 +145,6 @@ disable = [
     "R",
     "attribute-defined-outside-init",
     "broad-exception-caught",
-    "cell-var-from-loop",
-    "dangerous-default-value",
     "fixme",
     "protected-access",
     "raise-missing-from",
@@ -167,8 +158,21 @@ score = false
 [tool.pylint.variables]
 init-import = true
 
+[tool.pyrefly]
+python-version = "3.14"
+
+[tool.pyrefly.errors]
+# Enable some additional rules that are disabled by default
+implicit-abstract-class = true
+missing-override-decorator = true
+missing-source = true
+not-required-key-access = true
+open-unpacking = true
+unannotated-parameter = true
+unused-ignore = true
+
 [tool.ruff]
-target-version = "py312"
+target-version = "py314"
 line-length = 160
 
 [tool.ruff.format]
@@ -180,6 +184,7 @@ docstring-code-format = true
 select = [
     "ASYNC",  # flake8-async
     "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
     "C90",    # mccabe
     "COM",    # flake8-commas
     "DTZ",    # flake8-datetimez
@@ -191,6 +196,7 @@ select = [
     "G",      # flake8-logging-format
     "I",      # isort
     "ICN",    # flake8-import-conventions
+    "INT",    # flake8-gettext
     "ISC",    # flake8-implicit-str-concat
     "LOG",    # flake8-logging
     "PGH",    # pygrep-hooks
@@ -203,16 +209,15 @@ select = [
     "RUF",    # Ruff-specific rules
     "SLOT",   # flake8-slot
     "T10",    # flake8-debugger
+    "TID",    # flake8-tidy-imports (Enables TID252)
     "UP",     # pyupgrade
     "W",      # pycodestyle warnings
     "YTT",    # flake8-2020
 ]
 
 ignore = [
-    "B006",     # mutable-argument-default
     "B008",     # function-call-in-default-argument
     "B904",     # raise-without-from-inside-except
-    "B905",     # zip-without-explicit-strict
     "B909",     # loop-iterator-mutation
     "COM812",   # missing-trailing-comma
     "PLC0415",  # import-outside-top-level
@@ -221,12 +226,18 @@ ignore = [
     "PLW1641",  # eq-without-hash
     "PLW2901",  # redefined-loop-name
     "RUF005",   # collection-literal-concatenation
-    "RUF015",   # unnecessary-iterable-allocation-for-first-element
     "RUF039",   # unraw-re-pattern
-    "RUF051",   # if-key-in-dict-del
-    "UP037",    # quoted-annotation
     "W191",     # tab-indentation
 ]
+
+[tool.ruff.lint.flake8-gettext]
+function-names = [
+    "tr",
+    "tr_noop",
+]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
 
 [tool.ruff.lint.mccabe]
 max-complexity = 40

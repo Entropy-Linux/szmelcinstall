@@ -6,15 +6,18 @@ import socket
 import ssl
 import struct
 import time
+from pathlib import Path
 from types import FrameType, TracebackType
-from typing import Self
+from typing import Final, Self
 from urllib.error import URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
-from .exceptions import DownloadTimeout, SysCallError
-from .output import debug, error, info
-from .pacman import Pacman
+from archinstall.lib.exceptions import DownloadTimeout, SysCallError
+from archinstall.lib.log import debug, error, info
+from archinstall.lib.pacman.pacman import Pacman
+
+SYS_NET: Final = Path('/sys/class/net')
 
 
 class DownloadTimer:
@@ -46,12 +49,12 @@ class DownloadTimer:
 			self.previous_handler = signal.signal(signal.SIGALRM, self.raise_timeout)  # type: ignore[assignment]
 			self.previous_timer = signal.alarm(self.timeout)
 
-		self.start_time = time.time()
+		self.start_time = time.monotonic()
 		return self
 
 	def __exit__(self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None) -> None:
 		if self.start_time:
-			time_delta = time.time() - self.start_time
+			time_delta = time.monotonic() - self.start_time
 			signal.alarm(0)
 			self.time = time_delta
 			if self.timeout > 0:
@@ -105,13 +108,14 @@ def enrich_iface_types(interfaces: list[str]) -> dict[str, str]:
 	result = {}
 
 	for iface in interfaces:
-		if os.path.isdir(f'/sys/class/net/{iface}/bridge/'):
+		path = SYS_NET / iface
+		if (path / 'bridge').is_dir():
 			result[iface] = 'BRIDGE'
-		elif os.path.isfile(f'/sys/class/net/{iface}/tun_flags'):
+		elif (path / 'tun_flags').is_file():
 			# ethtool -i {iface}
 			result[iface] = 'TUN/TAP'
-		elif os.path.isdir(f'/sys/class/net/{iface}/device'):
-			if os.path.isdir(f'/sys/class/net/{iface}/wireless/'):
+		elif (path / 'device').is_dir():
+			if (path / 'wireless').is_dir():
 				result[iface] = 'WIRELESS'
 			else:
 				result[iface] = 'PHYSICAL'
@@ -121,7 +125,7 @@ def enrich_iface_types(interfaces: list[str]) -> dict[str, str]:
 	return result
 
 
-def fetch_data_from_url(url: str, params: dict[str, str] | None = None) -> str:
+def fetch_data_from_url(url: str, params: dict[str, str] | None = None, timeout: int = 30) -> bytes:
 	ssl_context = ssl.create_default_context()
 	ssl_context.check_hostname = False
 	ssl_context.verify_mode = ssl.CERT_NONE
@@ -133,9 +137,8 @@ def fetch_data_from_url(url: str, params: dict[str, str] | None = None) -> str:
 		full_url = url
 
 	try:
-		response = urlopen(full_url, context=ssl_context)
-		data = response.read().decode('UTF-8')
-		return data
+		response = urlopen(full_url, context=ssl_context, timeout=timeout)
+		return response.read()
 	except URLError as e:
 		raise ValueError(f'Unable to fetch data from url: {url}\n{e}')
 	except Exception as e:
@@ -165,7 +168,7 @@ def build_icmp(payload: bytes) -> bytes:
 
 def ping(hostname: str, timeout: int = 5) -> int:
 	watchdog = select.epoll()
-	started = time.time()
+	started = time.monotonic()
 	random_identifier = f'archinstall-{random.randint(1000, 9999)}'.encode()
 
 	# Create a raw socket (requires root, which should be fine on archiso)
@@ -180,7 +183,7 @@ def ping(hostname: str, timeout: int = 5) -> int:
 
 	# Gracefully wait for X amount of time
 	# for a ICMP response or exit with no latency
-	while latency == -1 and time.time() - started < timeout:
+	while latency == -1 and time.monotonic() - started < timeout:
 		try:
 			for _fileno, _event in watchdog.poll(0.1):
 				response, _ = icmp_socket.recvfrom(1024)
@@ -188,7 +191,7 @@ def ping(hostname: str, timeout: int = 5) -> int:
 
 				# Check if it's an Echo Reply (ICMP type 0)
 				if icmp_type == 0 and response[-len(random_identifier) :] == random_identifier:
-					latency = round((time.time() - started) * 1000)
+					latency = round((time.monotonic() - started) * 1000)
 					break
 		except OSError as e:
 			debug(f'Error: {e}')

@@ -1,57 +1,65 @@
-from __future__ import annotations
-
 from typing import override
 
+from archinstall.default_profiles.profile import GreeterType
+from archinstall.lib.applications.application_menu import ApplicationMenu
+from archinstall.lib.args import ArchConfig
+from archinstall.lib.authentication.authentication_menu import AuthenticationMenu
+from archinstall.lib.bootloader.bootloader_menu import BootloaderMenu
+from archinstall.lib.bootloader.utils import validate_bootloader_layout
+from archinstall.lib.configuration import save_config
 from archinstall.lib.disk.disk_menu import DiskLayoutConfigurationMenu
-from archinstall.lib.models.application import ApplicationConfiguration
+from archinstall.lib.entropy.tweaks import ArchTweaksMenu, EntropyTweaksMenu
+from archinstall.lib.general.general_menu import select_hostname, select_ntp, select_timezone
+from archinstall.lib.general.system_menu import select_kernel, select_swap
+from archinstall.lib.hardware import SysInfo
+from archinstall.lib.locale.locale_menu import LocaleMenu
+from archinstall.lib.menu.abstract_menu import AbstractMenu, SpecialMenuKey
+from archinstall.lib.mirror.mirror_handler import MirrorListHandler
+from archinstall.lib.mirror.mirror_menu import MirrorMenu
+from archinstall.lib.models.application import ApplicationConfiguration, ZramConfiguration
 from archinstall.lib.models.authentication import AuthenticationConfiguration
-from archinstall.lib.models.device import DiskLayoutConfiguration, DiskLayoutType, EncryptionType, FilesystemType, PartitionModification
-from archinstall.lib.packages import list_available_packages
-from archinstall.tui.menu_item import MenuItem, MenuItemGroup
-
-from .applications.application_menu import ApplicationMenu
-from .args import ArchConfig
-from .authentication.authentication_menu import AuthenticationMenu
-from .bootloader.bootloader_menu import BootloaderMenu
-from .configuration import save_config
-from .hardware import SysInfo
-from .interactions.general_conf import (
-	add_number_of_parallel_downloads,
-	ask_additional_packages_to_install,
-	ask_for_a_timezone,
-	ask_hostname,
-	ask_ntp,
-)
-from .interactions.network_menu import ask_to_configure_network
-from .interactions.tweaks import ArchTweaksMenu, EntropyTweaksMenu
-from .interactions.system_conf import ask_for_swap, select_kernel
-from .locale.locale_menu import LocaleMenu
-from .menu.abstract_menu import CONFIG_KEY, AbstractMenu
-from .mirrors import MirrorMenu
-from .models.bootloader import Bootloader, BootloaderConfiguration
-from .models.locale import LocaleConfiguration
-from .models.mirrors import MirrorConfiguration
-from .models.network import NetworkConfiguration, NicType
-from .models.packages import Repository
-from .models.profile import ProfileConfiguration
-from .output import FormattedOutput
-from .pacman.config import PacmanConfig
-from .translationhandler import Language, tr, translation_handler
-from archinstall.tui.types import STYLE
+from archinstall.lib.models.bootloader import Bootloader, BootloaderConfiguration
+from archinstall.lib.models.device import DiskLayoutConfiguration, DiskLayoutType, PartitionModification
+from archinstall.lib.models.locale import LocaleConfiguration
+from archinstall.lib.models.mirrors import MirrorConfiguration
+from archinstall.lib.models.network import NetworkConfiguration, NicType
+from archinstall.lib.models.package_types import DEFAULT_KERNEL
+from archinstall.lib.models.packages import Repository
+from archinstall.lib.models.pacman import PacmanConfiguration
+from archinstall.lib.models.profile import ProfileConfiguration
+from archinstall.lib.network.network_menu import select_network
+from archinstall.lib.packages.packages import list_available_packages, select_additional_packages
+from archinstall.lib.pacman.config import PacmanConfig
+from archinstall.lib.pacman.pacman_menu import PacmanMenu
+from archinstall.lib.translationhandler import Language, tr, translation_handler
+from archinstall.lib.utils.format import as_table
+from archinstall.tui.components import tui
+from archinstall.tui.menu_item import MenuItem, MenuItemGroup, MsgLevelType, PreviewResult
 
 
 class GlobalMenu(AbstractMenu[None]):
-	def __init__(self, arch_config: ArchConfig) -> None:
+	def __init__(
+		self,
+		arch_config: ArchConfig,
+		mirror_list_handler: MirrorListHandler | None = None,
+		skip_boot: bool = False,
+		advanced: bool = False,
+		title: str | None = None,
+	) -> None:
 		self._arch_config = arch_config
-		menu_optioons = self._get_menu_options()
+		self._mirror_list_handler = mirror_list_handler
+		self._skip_boot = skip_boot
+		self._advanced = advanced
+		self._uefi = SysInfo.has_uefi()
+		menu_options = self._get_menu_options()
 
 		self._item_group = MenuItemGroup(
-			menu_optioons,
+			menu_options,
 			sort_items=False,
 			checkmarks=True,
 		)
 
-		super().__init__(self._item_group, config=arch_config)
+		super().__init__(self._item_group, config=arch_config, title=title)
 
 	def _get_menu_options(self) -> list[MenuItem]:
 		menu_options = [
@@ -60,23 +68,22 @@ class GlobalMenu(AbstractMenu[None]):
 				action=self._entropy_tweaks,
 				preview_action=self._prev_entropy_tweaks,
 				key='entropy_tweaks',
-				style=STYLE.HELP,
 			),
 			MenuItem(
 				text=tr('Arch Tweaks'),
 				action=self._arch_tweaks,
 				preview_action=self._prev_arch_tweaks,
 				key='arch_tweaks',
-				style=STYLE.CURSOR_STYLE,
 			),
 			MenuItem(
 				text=tr('Archinstall language'),
 				action=self._select_archinstall_language,
-				display_action=lambda x: x.display_name if x else '',
+				preview_action=self._prev_archinstall_language,
 				key='archinstall_language',
 			),
 			MenuItem(
 				text=tr('Locales'),
+				value=LocaleConfiguration.default(),
 				action=self._locale_selection,
 				preview_action=self._prev_locale,
 				key='locale_config',
@@ -96,22 +103,30 @@ class GlobalMenu(AbstractMenu[None]):
 			),
 			MenuItem(
 				text=tr('Swap'),
-				value=True,
-				action=ask_for_swap,
+				value=ZramConfiguration(enabled=True),
+				action=select_swap,
 				preview_action=self._prev_swap,
 				key='swap',
 			),
 			MenuItem(
 				text=tr('Bootloader'),
-				value=BootloaderConfiguration.get_default(),
+				value=BootloaderConfiguration.get_default(self._uefi, self._skip_boot),
 				action=self._select_bootloader_config,
 				preview_action=self._prev_bootloader_config,
 				key='bootloader_config',
 			),
 			MenuItem(
+				text=tr('Kernels'),
+				value=[DEFAULT_KERNEL],
+				action=select_kernel,
+				preview_action=self._prev_kernel,
+				mandatory=True,
+				key='kernels',
+			),
+			MenuItem(
 				text=tr('Hostname'),
 				value='archlinux',
-				action=ask_hostname,
+				action=select_hostname,
 				preview_action=self._prev_hostname,
 				key='hostname',
 			),
@@ -135,26 +150,18 @@ class GlobalMenu(AbstractMenu[None]):
 				key='app_config',
 			),
 			MenuItem(
-				text=tr('Kernels'),
-				value=['linux'],
-				action=select_kernel,
-				preview_action=self._prev_kernel,
-				mandatory=True,
-				key='kernels',
-			),
-			MenuItem(
 				text=tr('Network configuration'),
-				action=ask_to_configure_network,
+				action=select_network,
 				value={},
 				preview_action=self._prev_network_config,
 				key='network_config',
 			),
 			MenuItem(
-				text=tr('Parallel Downloads'),
-				action=add_number_of_parallel_downloads,
-				value=0,
-				preview_action=self._prev_parallel_dw,
-				key='parallel_downloads',
+				text=tr('Pacman'),
+				action=self._pacman_configuration,
+				value=PacmanConfiguration(),
+				preview_action=self._prev_pacman_config,
+				key='pacman_config',
 			),
 			MenuItem(
 				text=tr('Additional packages'),
@@ -165,48 +172,48 @@ class GlobalMenu(AbstractMenu[None]):
 			),
 			MenuItem(
 				text=tr('Timezone'),
-				action=ask_for_a_timezone,
+				action=select_timezone,
 				value='UTC',
 				preview_action=self._prev_tz,
 				key='timezone',
 			),
 			MenuItem(
 				text=tr('Automatic time sync (NTP)'),
-				action=ask_ntp,
+				action=select_ntp,
 				value=True,
 				preview_action=self._prev_ntp,
 				key='ntp',
 			),
 			MenuItem(
 				text='',
+				read_only=True,
 			),
 			MenuItem(
 				text=tr('Save configuration'),
 				action=lambda x: self._safe_config(),
-				key=f'{CONFIG_KEY}_save',
+				key=SpecialMenuKey.SAVE.value,
 			),
 			MenuItem(
 				text=tr('Install'),
 				preview_action=self._prev_install_invalid_config,
-				key=f'{CONFIG_KEY}_install',
+				key=SpecialMenuKey.INSTALL.value,
 			),
 			MenuItem(
 				text=tr('Abort'),
-				action=lambda x: exit(1),
-				key=f'{CONFIG_KEY}_abort',
+				key=SpecialMenuKey.ABORT.value,
 			),
 		]
 
 		return menu_options
 
-	def _safe_config(self) -> None:
+	async def _safe_config(self) -> None:
 		# data: dict[str, Any] = {}
 		# for item in self._item_group.items:
-		# 	if item.key is not None:
-		# 		data[item.key] = item.value
+		# if item.key is not None:
+		# data[item.key] = item.value
 
 		self.sync_all_to_config()
-		save_config(self._arch_config)
+		await save_config(self._arch_config)
 
 	def _missing_configs(self) -> list[str]:
 		item: MenuItem = self._item_group.find_by_key('auth_config')
@@ -216,17 +223,24 @@ class GlobalMenu(AbstractMenu[None]):
 			item = self._item_group.find_by_key(s)
 			return item.has_value()
 
-		def has_superuser() -> bool:
-			if auth_config and auth_config.users:
-				return any([u.sudo for u in auth_config.users])
-			return False
-
 		missing = set()
 
-		if (auth_config is None or auth_config.root_enc_password is None) and not has_superuser():
+		if (auth_config is None or auth_config.root_enc_password is None) and not (auth_config and auth_config.has_superuser()):
 			missing.add(
 				tr('Either root-password or at least 1 user with sudo privileges must be specified'),
 			)
+
+		# These greeters only show users with UID >= 1000 and have no manual login by default
+		if not (auth_config and auth_config.has_regular_user()):
+			profile_item: MenuItem = self._item_group.find_by_key('profile_config')
+			profile_config: ProfileConfiguration | None = profile_item.value
+
+			if profile_config and profile_config.profile and profile_config.profile.is_desktop_profile():
+				problematic_greeters = {GreeterType.Sddm}
+				if any(p.default_greeter_type in problematic_greeters for p in profile_config.profile.current_selection):
+					missing.add(
+						tr('The selected desktop profile requires a regular user to log in via the greeter'),
+					)
 
 		for item in self._item_group.items:
 			if item.mandatory:
@@ -237,7 +251,7 @@ class GlobalMenu(AbstractMenu[None]):
 		return list(missing)
 
 	@override
-	def _is_config_valid(self) -> bool:
+	def is_config_valid(self) -> bool:
 		"""
 		Checks the validity of the current configuration.
 		"""
@@ -245,22 +259,29 @@ class GlobalMenu(AbstractMenu[None]):
 			return False
 		return self._validate_bootloader() is None
 
-	def _select_archinstall_language(self, preset: Language) -> Language:
-		from .interactions.general_conf import select_archinstall_language
+	async def _select_archinstall_language(self, preset: Language) -> Language:
+		from archinstall.lib.general.general_menu import select_archinstall_language
 
-		language = select_archinstall_language(translation_handler.translated_languages, preset)
+		language = await select_archinstall_language(translation_handler.translated_languages, preset)
 		translation_handler.activate(language)
 
 		self._update_lang_text()
 
 		return language
 
-	def _select_applications(self, preset: ApplicationConfiguration | None) -> ApplicationConfiguration | None:
-		app_config = ApplicationMenu(preset).run()
+	def _prev_archinstall_language(self, item: MenuItem) -> str | None:
+		if not item.value:
+			return None
+
+		lang: Language = item.value
+		return f'{tr("Language")}: {lang.display_name}'
+
+	async def _select_applications(self, preset: ApplicationConfiguration | None) -> ApplicationConfiguration | None:
+		app_config = await ApplicationMenu(preset).show()
 		return app_config
 
-	def _select_authentication(self, preset: AuthenticationConfiguration | None) -> AuthenticationConfiguration | None:
-		auth_config = AuthenticationMenu(preset).run()
+	async def _select_authentication(self, preset: AuthenticationConfiguration | None) -> AuthenticationConfiguration | None:
+		auth_config = await AuthenticationMenu(preset).show()
 		return auth_config
 
 	def _update_lang_text(self) -> None:
@@ -274,8 +295,10 @@ class GlobalMenu(AbstractMenu[None]):
 			if o.key is not None:
 				self._item_group.find_by_key(o.key).text = o.text
 
-	def _locale_selection(self, preset: LocaleConfiguration) -> LocaleConfiguration:
-		locale_config = LocaleMenu(preset).run()
+		tui.translate_bindings()
+
+	async def _locale_selection(self, preset: LocaleConfiguration) -> LocaleConfiguration | None:
+		locale_config = await LocaleMenu(preset).show()
 		return locale_config
 
 	def _prev_locale(self, item: MenuItem) -> str | None:
@@ -289,7 +312,7 @@ class GlobalMenu(AbstractMenu[None]):
 		if item.value:
 			network_config: NetworkConfiguration = item.value
 			if network_config.type == NicType.MANUAL:
-				output = FormattedOutput.as_table(network_config.nics)
+				output = as_table(network_config.nics)
 			else:
 				output = f'{tr("Network configuration")}:\n{network_config.type.display_msg()}'
 
@@ -305,20 +328,20 @@ class GlobalMenu(AbstractMenu[None]):
 	def _prev_entropy_tweaks(self, item: MenuItem) -> str | None:
 		flags = []
 		if self._arch_config.install_from_iso:
-			mode = getattr(self._arch_config, 'install_from_iso_mode', 'configs')
+			mode = self._arch_config.install_from_iso_mode
 			label = tr('Configs + Live Cache') if mode == 'configs_cache' else tr('Configs')
-			flags.append(f"{tr('Install from ISO')}: {label}")
-		if getattr(self._arch_config, 'custom_script', False):
+			flags.append(f'{tr("Install from ISO")}: {label}')
+		if self._arch_config.custom_script:
 			flags.append(tr('Custom script'))
 		if self._arch_config.szmelc_aur:
 			flags.append('Szmelc AUR')
-		if getattr(self._arch_config, 'entropy_kits', []):
+		if self._arch_config.entropy_kits:
 			flags.append(tr('Kits: {}').format(len(self._arch_config.entropy_kits)))
-		if getattr(self._arch_config, 'entropy_szmelc_packages', []):
+		if self._arch_config.entropy_szmelc_packages:
 			flags.append(tr('Szmelc packages: {}').format(len(self._arch_config.entropy_szmelc_packages)))
-		if getattr(self._arch_config, 'entropy_config_packs', []):
+		if self._arch_config.entropy_config_packs:
 			flags.append(tr('Configs: {}').format(len(self._arch_config.entropy_config_packs)))
-		if getattr(self._arch_config, 'entropy_asset_packs', []):
+		if self._arch_config.entropy_asset_packs:
 			flags.append(tr('Assets: {}').format(len(self._arch_config.entropy_asset_packs)))
 		return ', '.join(flags) if flags else tr('No tweaks enabled')
 
@@ -330,6 +353,12 @@ class GlobalMenu(AbstractMenu[None]):
 			flags.append('Chaotic AUR')
 		return ', '.join(flags) if flags else tr('No tweaks enabled')
 
+	async def _entropy_tweaks(self, preset: None = None) -> None:
+		await EntropyTweaksMenu(self._arch_config).show()
+
+	async def _arch_tweaks(self, preset: None = None) -> None:
+		await ArchTweaksMenu(self._arch_config).show()
+
 	def _prev_authentication(self, item: MenuItem) -> str | None:
 		if item.value:
 			auth_config: AuthenticationConfiguration = item.value
@@ -339,7 +368,7 @@ class GlobalMenu(AbstractMenu[None]):
 				output += f'{tr("Root password")}: {auth_config.root_enc_password.hidden()}\n'
 
 			if auth_config.users:
-				output += FormattedOutput.as_table(auth_config.users) + '\n'
+				output += as_table(auth_config.users) + '\n'
 
 			if auth_config.u2f_config:
 				u2f_config = auth_config.u2f_config
@@ -366,6 +395,21 @@ class GlobalMenu(AbstractMenu[None]):
 			if app_config.audio_config:
 				audio_config = app_config.audio_config
 				output += f'{tr("Audio")}: {audio_config.audio.value}'
+				output += '\n'
+
+			if app_config.print_service_config:
+				output += f'{tr("Print service")}: '
+				output += tr('Enabled') if app_config.print_service_config.enabled else tr('Disabled')
+				output += '\n'
+
+			if app_config.power_management_config:
+				power_management_config = app_config.power_management_config
+				output += f'{tr("Power management")}: {power_management_config.power_management.value}'
+				output += '\n'
+
+			if app_config.firewall_config:
+				firewall_config = app_config.firewall_config
+				output += f'{tr("Firewall")}: {firewall_config.firewall.value}'
 				output += '\n'
 
 			return output
@@ -397,7 +441,7 @@ class GlobalMenu(AbstractMenu[None]):
 				output += '{}: {}'.format(tr('LVM configuration type'), disk_layout_conf.lvm_config.config_type.display_msg()) + '\n'
 
 			if disk_layout_conf.disk_encryption:
-				output += tr('Disk encryption') + ': ' + EncryptionType.type_to_text(disk_layout_conf.disk_encryption.encryption_type) + '\n'
+				output += tr('Disk encryption') + ': ' + disk_layout_conf.disk_encryption.encryption_type.type_to_text() + '\n'
 
 			if disk_layout_conf.btrfs_options:
 				btrfs_options = disk_layout_conf.btrfs_options
@@ -411,7 +455,9 @@ class GlobalMenu(AbstractMenu[None]):
 	def _prev_swap(self, item: MenuItem) -> str | None:
 		if item.value is not None:
 			output = f'{tr("Swap on zram")}: '
-			output += tr('Enabled') if item.value else tr('Disabled')
+			output += tr('Enabled') if item.value.enabled else tr('Disabled')
+			if item.value.enabled:
+				output += f'\n{tr("Compression algorithm")}: {item.value.algorithm.value}'
 			return output
 		return None
 
@@ -420,10 +466,18 @@ class GlobalMenu(AbstractMenu[None]):
 			return f'{tr("Hostname")}: {item.value}'
 		return None
 
-	def _prev_parallel_dw(self, item: MenuItem) -> str | None:
-		if item.value is not None:
-			return f'{tr("Parallel Downloads")}: {item.value}'
-		return None
+	async def _pacman_configuration(self, preset: PacmanConfiguration) -> PacmanConfiguration | None:
+		return await PacmanMenu(preset, advanced=self._advanced).show()
+
+	def _prev_pacman_config(self, item: MenuItem) -> str | None:
+		if not item.value:
+			return None
+		config: PacmanConfiguration = item.value
+		output = ''
+		if self._advanced:
+			output += '{}: {}\n'.format(tr('Parallel Downloads'), config.parallel_downloads)
+		output += '{}: {}'.format(tr('Color'), config.color)
+		return output
 
 	def _prev_kernel(self, item: MenuItem) -> str | None:
 		if item.value:
@@ -434,7 +488,7 @@ class GlobalMenu(AbstractMenu[None]):
 	def _prev_bootloader_config(self, item: MenuItem) -> str | None:
 		bootloader_config: BootloaderConfiguration | None = item.value
 		if bootloader_config:
-			return bootloader_config.preview()
+			return bootloader_config.preview(self._uefi)
 		return None
 
 	def _validate_bootloader(self) -> str | None:
@@ -444,9 +498,6 @@ class GlobalMenu(AbstractMenu[None]):
 
 		Returns [`None`] if the bootloader is valid, otherwise returns a
 		string with the error message.
-
-		XXX: The caller is responsible for wrapping the string with the translation
-			shim if necessary.
 		"""
 		bootloader_config: BootloaderConfiguration | None = None
 		root_partition: PartitionModification | None = None
@@ -458,8 +509,6 @@ class GlobalMenu(AbstractMenu[None]):
 		if not bootloader_config or bootloader_config.bootloader == Bootloader.NO_BOOTLOADER:
 			return None
 
-		bootloader = bootloader_config.bootloader
-
 		if disk_config := self._item_group.find_by_key('disk_config').value:
 			for layout in disk_config.device_modifications:
 				if root_partition := layout.get_root_partition():
@@ -467,7 +516,7 @@ class GlobalMenu(AbstractMenu[None]):
 			for layout in disk_config.device_modifications:
 				if boot_partition := layout.get_boot_partition():
 					break
-			if SysInfo.has_uefi():
+			if self._uefi:
 				for layout in disk_config.device_modifications:
 					if efi_partition := layout.get_efi_partition():
 						break
@@ -480,30 +529,59 @@ class GlobalMenu(AbstractMenu[None]):
 		if boot_partition is None:
 			return 'Boot partition not found'
 
-		if SysInfo.has_uefi():
+		if self._uefi:
 			if efi_partition is None:
 				return 'EFI system partition (ESP) not found'
 
-			if efi_partition.fs_type not in [FilesystemType.Fat12, FilesystemType.Fat16, FilesystemType.Fat32]:
+			if efi_partition.fs_type is None or not efi_partition.fs_type.is_fat():
 				return 'ESP must be formatted as a FAT filesystem'
 
-		if bootloader == Bootloader.Limine:
-			if boot_partition.fs_type not in [FilesystemType.Fat12, FilesystemType.Fat16, FilesystemType.Fat32]:
-				return 'Limine does not support booting with a non-FAT boot partition'
+		if failure := validate_bootloader_layout(bootloader_config, disk_config):
+			return failure.description
 
 		return None
 
-	def _prev_install_invalid_config(self, item: MenuItem) -> str | None:
+	def _get_install_warnings(self) -> list[str]:
+		warnings: list[str] = []
+
+		if not isinstance(self._arch_config.network_config, NetworkConfiguration):
+			warnings.append(tr('No network configuration selected. Network will need to be set up manually on the installed system.'))
+
+		return warnings
+
+	def _prev_install_invalid_config(self, item: MenuItem) -> PreviewResult | None:
+		self.sync_all_to_config()
+
+		warnings = self._get_install_warnings()
+		messages: list[tuple[str, MsgLevelType]] = []
+
+		errors = ''
 		if missing := self._missing_configs():
-			text = tr('Missing configurations:\n')
-			for m in missing:
-				text += f'- {m}\n'
-			return text[:-1]  # remove last new line
+			errors += f'{tr("Missing configurations:")}\n'
+			errors += '\n'.join(f'- {m}' for m in missing)
 
-		if error := self._validate_bootloader():
-			return tr(f'Invalid configuration: {error}')
+		disk_item = self._item_group.find_by_key('disk_config')
+		if disk_item.has_value():
+			if error := self._validate_bootloader():
+				if errors:
+					errors += '\n\n'
+				errors += f'{tr("Invalid configuration:")}\n- {error}'
 
-		return None
+		if errors:
+			messages.append((errors, MsgLevelType.MsgError))
+		else:
+			messages.append((tr('Ready to install'), MsgLevelType.MsgInfo))
+
+		if warnings:
+			text = f'{tr("Warnings:")}\n' + '\n'.join(f'- {w}' for w in warnings)
+			messages.append((text, MsgLevelType.MsgWarning))
+
+		if not errors:
+			summary = self._arch_config.as_summary()
+			if summary:
+				messages.append((summary, MsgLevelType.MsgNone))
+
+		return PreviewResult(messages)
 
 	def _prev_profile(self, item: MenuItem) -> str | None:
 		profile_config: ProfileConfiguration | None = item.value
@@ -525,57 +603,51 @@ class GlobalMenu(AbstractMenu[None]):
 
 		return None
 
-	def _select_disk_config(
+	async def _select_disk_config(
 		self,
 		preset: DiskLayoutConfiguration | None = None,
 	) -> DiskLayoutConfiguration | None:
-		disk_config = DiskLayoutConfigurationMenu(preset).run()
-
+		disk_config = await DiskLayoutConfigurationMenu(preset).show()
 		return disk_config
 
-	def _select_bootloader_config(
+	async def _select_bootloader_config(
 		self,
 		preset: BootloaderConfiguration | None = None,
 	) -> BootloaderConfiguration | None:
 		if preset is None:
-			preset = BootloaderConfiguration.get_default()
+			preset = BootloaderConfiguration.get_default(self._uefi, self._skip_boot)
 
-		bootloader_config = BootloaderMenu(preset).run()
+		bootloader_config = await BootloaderMenu(preset, self._uefi, self._skip_boot).show()
 
 		return bootloader_config
 
-	def _select_profile(self, current_profile: ProfileConfiguration | None) -> ProfileConfiguration | None:
-		from .profile.profile_menu import ProfileMenu
+	async def _select_profile(self, current_profile: ProfileConfiguration | None) -> ProfileConfiguration | None:
+		from archinstall.lib.profile.profile_menu import ProfileMenu
 
-		profile_config = ProfileMenu(preset=current_profile).run()
+		profile_config = await ProfileMenu(preset=current_profile).show()
 		return profile_config
 
-	def _entropy_tweaks(self, preset: None = None) -> None:
-		EntropyTweaksMenu(self._arch_config).run()
-		return None
-
-	def _arch_tweaks(self, preset: None = None) -> None:
-		ArchTweaksMenu(self._arch_config).run()
-		return None
-
-	def _select_additional_packages(self, preset: list[str]) -> list[str]:
+	async def _select_additional_packages(self, preset: list[str]) -> list[str]:
 		config: MirrorConfiguration | None = self._item_group.find_by_key('mirror_config').value
 
 		repositories: set[Repository] = set()
 		if config:
 			repositories = set(config.optional_repositories)
 
-		packages = ask_additional_packages_to_install(
+		packages = await select_additional_packages(
 			preset,
 			repositories=repositories,
 		)
 
 		return packages
 
-	def _mirror_configuration(self, preset: MirrorConfiguration | None = None) -> MirrorConfiguration:
-		mirror_configuration = MirrorMenu(preset=preset).run()
+	async def _mirror_configuration(self, preset: MirrorConfiguration | None = None) -> MirrorConfiguration | None:
+		if self._mirror_list_handler is None:
+			self._mirror_list_handler = MirrorListHandler()
 
-		if mirror_configuration.optional_repositories:
+		mirror_configuration = await MirrorMenu(self._mirror_list_handler, preset=preset).run()
+
+		if mirror_configuration and mirror_configuration.optional_repositories:
 			# reset the package list cache in case the repository selection has changed
 			list_available_packages.cache_clear()
 
@@ -608,12 +680,12 @@ class GlobalMenu(AbstractMenu[None]):
 		if mirror_config.optional_repositories:
 			title = tr('Optional repositories')
 			divider = '-' * len(title)
-			repos = ', '.join([r.value for r in mirror_config.optional_repositories])
+			repos = ', '.join(r.value for r in mirror_config.optional_repositories)
 			output += f'{title}\n{divider}\n{repos}\n\n'
 
 		if mirror_config.custom_repositories:
 			title = tr('Custom repositories')
-			table = FormattedOutput.as_table(mirror_config.custom_repositories)
+			table = as_table(mirror_config.custom_repositories)
 			output += f'{title}:\n\n{table}'
 
 		return output.strip()

@@ -1,5 +1,4 @@
 import fnmatch
-import glob
 import json
 import os
 import platform
@@ -13,11 +12,31 @@ from collections.abc import Callable
 from pathlib import Path
 from subprocess import CalledProcessError
 from types import TracebackType
-from typing import Any
+from typing import Any, Self
 
-from archinstall.lib.disk.device_handler import device_handler
+from archinstall.lib.boot import Boot
+from archinstall.lib.bootloader.utils import validate_bootloader_layout
+from archinstall.lib.command import SysCommand, run
 from archinstall.lib.disk.fido import Fido2
-from archinstall.lib.disk.utils import get_lsblk_by_mountpoint, get_lsblk_info
+from archinstall.lib.disk.luks import Luks2, unlock_luks2_dev
+from archinstall.lib.disk.lvm import lvm_import_vg, lvm_pvseg_info, lvm_vol_change
+from archinstall.lib.disk.utils import (
+	get_lsblk_by_mountpoint,
+	get_lsblk_info,
+	get_parent_device_path,
+	get_unique_path_for_device,
+	mount,
+	swapon,
+)
+from archinstall.lib.error_recovery import InstallationAborted, report_dropped
+from archinstall.lib.exceptions import DiskError, HardwareIncompatibilityError, RequirementError, ServiceException, SysCallError
+from archinstall.lib.hardware import SysInfo
+from archinstall.lib.linux_path import LPath
+from archinstall.lib.locale.utils import verify_keyboard_layout, verify_x11_keyboard_layout
+from archinstall.lib.log import debug, error, info, log, logger, warn
+from archinstall.lib.mirror.mirror_handler import MirrorListHandler
+from archinstall.lib.models.application import ZramAlgorithm
+from archinstall.lib.models.bootloader import Bootloader, BootloaderConfiguration, PlymouthTheme
 from archinstall.lib.models.device import (
 	DiskEncryption,
 	DiskLayoutConfiguration,
@@ -31,31 +50,28 @@ from archinstall.lib.models.device import (
 	SubvolumeModification,
 	Unit,
 )
+from archinstall.lib.models.locale import LocaleConfiguration
+from archinstall.lib.models.mirrors import MirrorConfiguration
+from archinstall.lib.models.network import Nic
+from archinstall.lib.models.package_types import DEFAULT_KERNEL, Kernel
 from archinstall.lib.models.packages import Repository
-from archinstall.lib.packages import installed_package
+from archinstall.lib.models.pacman import PacmanConfiguration
+from archinstall.lib.models.users import User
+from archinstall.lib.packages.packages import installed_package
+from archinstall.lib.pacman.config import PacmanConfig
+from archinstall.lib.pacman.pacman import Pacman
+from archinstall.lib.pathnames import MIRRORLIST, PACMAN_CONF
+from archinstall.lib.plugins import plugins
 from archinstall.lib.translationhandler import tr
-from archinstall.tui.curses_menu import Tui
-
-from .args import arch_config_handler
-from .exceptions import DiskError, HardwareIncompatibilityError, RequirementError, ServiceException, SysCallError
-from .general import SysCommand, clear_vt100_escape_codes_from_str, run
-from .hardware import SysInfo
-from .locale.utils import verify_keyboard_layout, verify_x11_keyboard_layout
-from .luks import Luks2
-from .models.bootloader import Bootloader
-from .models.locale import LocaleConfiguration
-from .models.mirrors import MirrorConfiguration
-from .models.network import Nic
-from .models.mirrors import CustomRepository, SignCheck, SignOption
-from .models.users import User
-from .output import debug, error, info, log, logger, warn
-from .pacman import Pacman
-from .pacman.config import PacmanConfig
-from .plugins import plugins
-from .storage import storage
+from archinstall.lib.utils.encoding import clear_vt100_escape_codes_from_str
 
 # Any package that the Installer() is responsible for (optional and the default ones)
-__packages__ = ['base', 'base-devel', 'linux-firmware', 'linux', 'linux-lts', 'linux-zen', 'linux-hardened']
+# https://github.com/archlinux/archinstall/issues/4368
+# mkinitcpio is listed explicitly so pacstrap installs it deterministically. Otherwise
+# pacman picks the first initramfs provider from the host's pacman.conf, which on non-Arch
+# hosts (EndeavourOS prefers dracut, etc.) breaks the installer's mkinitcpio() and
+# _config_uki() methods that assume mkinitcpio is present in the chroot.
+__packages__ = ['base', 'sudo', 'linux-firmware', 'mkinitcpio'] + [k.value for k in Kernel]
 
 # Additional packages that are installed if the user is running the Live ISO with accessibility tools enabled
 __accessibility_packages__ = ['brltty', 'espeakup', 'alsa-utils']
@@ -66,22 +82,22 @@ class Installer:
 		self,
 		target: Path,
 		disk_config: DiskLayoutConfiguration,
-		base_packages: list[str] = [],
+		base_packages: list[str] | None = None,
 		kernels: list[str] | None = None,
+		silent: bool = False,
 	):
 		"""
 		`Installer()` is the wrapper for most basic installation steps.
 		It also wraps :py:func:`~archinstall.Installer.pacstrap` among other things.
 		"""
-		self._base_packages = base_packages or __packages__[:3]
-		self.kernels = kernels or ['linux']
+		self._base_packages = base_packages or __packages__[:4]
+		self.kernels = kernels or [DEFAULT_KERNEL.value]
 		self._disk_config = disk_config
 
-		self._disk_encryption = disk_config.disk_encryption or DiskEncryption(EncryptionType.NoEncryption)
+		self._disk_encryption = disk_config.disk_encryption or DiskEncryption(EncryptionType.NO_ENCRYPTION)
 		self.target: Path = target
 
 		self.init_time = time.strftime('%Y-%m-%d_%H-%M-%S')
-		self.milliseconds = int(str(time.time()).split('.')[1])
 		self._helper_flags: dict[str, str | bool | None] = {
 			'base': False,
 			'bootloader': None,
@@ -95,8 +111,6 @@ class Installer:
 			self._base_packages.extend(__accessibility_packages__)
 
 		self.post_base_install: list[Callable] = []  # type: ignore[type-arg]
-
-		storage['installation_session'] = self
 
 		self._modules: list[str] = []
 		self._binaries: list[str] = []
@@ -123,26 +137,37 @@ class Installer:
 		self._zram_enabled = False
 		self._disable_fstrim = False
 
-		self.pacman = Pacman(self.target, arch_config_handler.args.silent)
+		self._silent = silent
+		self._install_from_iso_config_cache: dict[str, dict[str, Any]] = {}
+		self.pacman = Pacman(self.target, silent)
 
-	def __enter__(self) -> 'Installer':
+	def __enter__(self) -> Self:
 		return self
 
 	def __exit__(self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None) -> bool | None:
 		if exc_type is not None:
+			if issubclass(exc_type, InstallationAborted):
+				# The user asked to stop from a recovery prompt. That is a choice,
+				# not a crash, so skip the bug report banner; main() reports it.
+				self.sync_log_to_install_medium()
+				return None
+
 			error(str(exc_value))
 
 			self.sync_log_to_install_medium()
 
 			# We avoid printing /mnt/<log path> because that might confuse people if they note it down
-			# and then reboot, and a identical log file will be found in the ISO medium anyway.
-			Tui.print(str(tr('[!] A log file has been created here: {}').format(logger.path)))
-			Tui.print(tr('Please submit this issue (and file) to https://github.com/archlinux/archinstall/issues'))
+			# and then reboot, and an identical log file will be found in the ISO medium anyway.
+			print(tr('[!] A log file has been created here: {}').format(logger.path))
+			print(tr('Please submit this issue (and file) to https://github.com/archlinux/archinstall/issues'))
 
 			# Return None to propagate the exception
 			return None
 
-		self.sync()
+		info(tr('Syncing the system...'))
+		os.sync()
+
+		report_dropped(self.pacman.dropped_packages)
 
 		if not (missing_steps := self.post_install_check()):
 			msg = f'Installation completed without any errors.\nLog files temporarily available at {logger.directory}.\nYou may reboot when ready.\n'
@@ -161,10 +186,6 @@ class Installer:
 			self.sync_log_to_install_medium()
 			return False
 
-	def sync(self) -> None:
-		info(tr('Syncing the system...'))
-		SysCommand('sync')
-
 	def remove_mod(self, mod: str) -> None:
 		if mod in self._modules:
 			self._modules.remove(mod)
@@ -173,20 +194,20 @@ class Installer:
 		if mod not in self._modules:
 			self._modules.append(mod)
 
-	def _verify_service_stop(self) -> None:
+	def _verify_service_stop(self, offline: bool, skip_ntp: bool, skip_wkd: bool) -> None:
 		"""
 		Certain services might be running that affects the system during installation.
 		One such service is "reflector.service" which updates /etc/pacman.d/mirrorlist
 		We need to wait for it before we continue since we opted in to use a custom mirror/region.
 		"""
 
-		if not arch_config_handler.args.skip_ntp:
+		if not skip_ntp:
 			info(tr('Waiting for time sync (timedatectl show) to complete.'))
 
-			started_wait = time.time()
+			started_wait = time.monotonic()
 			notified = False
 			while True:
-				if not notified and time.time() - started_wait > 5:
+				if not notified and time.monotonic() - started_wait > 5:
 					notified = True
 					warn(tr('Time synchronization not completing, while you wait - check the docs for workarounds: https://archinstall.readthedocs.io/'))
 
@@ -197,15 +218,22 @@ class Installer:
 		else:
 			info(tr('Skipping waiting for automatic time sync (this can cause issues if time is out of sync during installation)'))
 
-		info('Waiting for automatic mirror selection (reflector) to complete.')
-		while self._service_state('reflector') not in ('dead', 'failed', 'exited'):
-			time.sleep(1)
+		if not offline:
+			info('Waiting for automatic mirror selection (reflector) to complete.')
+			for _ in range(60):
+				if self._service_state('reflector') in ('dead', 'failed', 'exited'):
+					break
+				time.sleep(1)
+			else:
+				warn('Reflector did not complete within 60 seconds, continuing anyway...')
+		else:
+			info('Skipped reflector...')
 
 		# info('Waiting for pacman-init.service to complete.')
 		# while self._service_state('pacman-init') not in ('dead', 'failed', 'exited'):
-		# 	time.sleep(1)
+		# time.sleep(1)
 
-		if not arch_config_handler.args.skip_wkd:
+		if not skip_wkd:
 			info(tr('Waiting for Arch Linux keyring sync (archlinux-keyring-wkd-sync) to complete.'))
 			# Wait for the timer to kick in
 			while self._service_started('archlinux-keyring-wkd-sync.timer') is None:
@@ -214,6 +242,9 @@ class Installer:
 			# Wait for the service to enter a finished state
 			while self._service_state('archlinux-keyring-wkd-sync.service') not in ('dead', 'failed', 'exited'):
 				time.sleep(1)
+
+			if self._service_state('archlinux-keyring-wkd-sync.service') == 'failed':
+				warn('archlinux-keyring-wkd-sync failed, keyring may need reinit during pacman sync')
 
 	def _verify_boot_part(self) -> None:
 		"""
@@ -233,9 +264,14 @@ class Installer:
 					f'Please resize it to at least 200MiB and re-run the installation.',
 				)
 
-	def sanity_check(self) -> None:
+	def sanity_check(
+		self,
+		offline: bool = False,
+		skip_ntp: bool = False,
+		skip_wkd: bool = False,
+	) -> None:
 		# self._verify_boot_part()
-		self._verify_service_stop()
+		self._verify_service_stop(offline, skip_ntp, skip_wkd)
 
 	def mount_ordered_layout(self) -> None:
 		debug('Mounting ordered layout')
@@ -243,15 +279,16 @@ class Installer:
 		luks_handlers: dict[Any, Luks2] = {}
 
 		match self._disk_encryption.encryption_type:
-			case EncryptionType.NoEncryption:
+			case EncryptionType.NO_ENCRYPTION:
+				self._import_lvm()
 				self._mount_lvm_layout()
-			case EncryptionType.Luks:
+			case EncryptionType.LUKS:
 				luks_handlers = self._prepare_luks_partitions(self._disk_encryption.partitions)
-			case EncryptionType.LvmOnLuks:
+			case EncryptionType.LVM_ON_LUKS:
 				luks_handlers = self._prepare_luks_partitions(self._disk_encryption.partitions)
 				self._import_lvm()
 				self._mount_lvm_layout(luks_handlers)
-			case EncryptionType.LuksOnLvm:
+			case EncryptionType.LUKS_ON_LVM:
 				self._import_lvm()
 				luks_handlers = self._prepare_luks_lvm(self._disk_encryption.lvm_volumes)
 				self._mount_lvm_layout(luks_handlers)
@@ -290,7 +327,7 @@ class Installer:
 				else:
 					self._mount_partition(part_mod)
 
-	def _mount_lvm_layout(self, luks_handlers: dict[Any, Luks2] = {}) -> None:
+	def _mount_lvm_layout(self, luks_handlers: dict[Any, Luks2] | None = None) -> None:
 		lvm_config = self._disk_config.lvm_config
 
 		if not lvm_config:
@@ -303,7 +340,7 @@ class Installer:
 			sorted_vol = sorted(vg.volumes, key=lambda x: x.mountpoint or Path('/'))
 
 			for vol in sorted_vol:
-				if luks_handler := luks_handlers.get(vol):
+				if luks_handlers is not None and (luks_handler := luks_handlers.get(vol)):
 					self._mount_luks_volume(vol, luks_handler)
 				else:
 					self._mount_lvm_vol(vol)
@@ -313,7 +350,7 @@ class Installer:
 		partitions: list[PartitionModification],
 	) -> dict[PartitionModification, Luks2]:
 		return {
-			part_mod: device_handler.unlock_luks2_dev(
+			part_mod: unlock_luks2_dev(
 				part_mod.dev_path,
 				part_mod.mapper_name,
 				self._disk_encryption.encryption_password,
@@ -330,17 +367,17 @@ class Installer:
 			return
 
 		for vg in lvm_config.vol_groups:
-			device_handler.lvm_import_vg(vg)
+			lvm_import_vg(vg)
 
 			for vol in vg.volumes:
-				device_handler.lvm_vol_change(vol, True)
+				lvm_vol_change(vol, True)
 
 	def _prepare_luks_lvm(
 		self,
 		lvm_volumes: list[LvmVolume],
 	) -> dict[LvmVolume, Luks2]:
 		return {
-			vol: device_handler.unlock_luks2_dev(
+			vol: unlock_luks2_dev(
 				vol.dev_path,
 				vol.mapper_name,
 				self._disk_encryption.encryption_password,
@@ -356,68 +393,92 @@ class Installer:
 		# it would be none if it's btrfs as the subvolumes will have the mountpoints defined
 		if part_mod.mountpoint:
 			target = self.target / part_mod.relative_mountpoint
-			device_handler.mount(part_mod.dev_path, target, options=part_mod.mount_options)
-		elif part_mod.fs_type == FilesystemType.Btrfs:
-			self._mount_btrfs_subvol(
-				part_mod.dev_path,
-				part_mod.btrfs_subvols,
-				part_mod.mount_options,
-			)
+			options = part_mod.mount_options
+
+			if part_mod.is_efi():
+				options = list(dict.fromkeys(options + ['fmask=0177', 'dmask=0077']))
+
+			mount(part_mod.dev_path, target, options=options)
+		elif part_mod.fs_type == FilesystemType.BTRFS:
+			# Only mount BTRFS subvolumes that have mountpoints specified
+			subvols_with_mountpoints = [sv for sv in part_mod.btrfs_subvols if sv.mountpoint is not None]
+			if subvols_with_mountpoints:
+				self._mount_btrfs_subvol(
+					part_mod.dev_path,
+					part_mod.btrfs_subvols,
+					part_mod.mount_options,
+				)
 		elif part_mod.is_swap():
-			device_handler.swapon(part_mod.dev_path)
+			swapon(part_mod.dev_path)
 
 	def _mount_lvm_vol(self, volume: LvmVolume) -> None:
-		if volume.fs_type != FilesystemType.Btrfs:
+		if volume.fs_type != FilesystemType.BTRFS:
 			if volume.mountpoint and volume.dev_path:
 				target = self.target / volume.relative_mountpoint
-				device_handler.mount(volume.dev_path, target, options=volume.mount_options)
+				mount(volume.dev_path, target, options=volume.mount_options)
 
-		if volume.fs_type == FilesystemType.Btrfs and volume.dev_path:
-			self._mount_btrfs_subvol(volume.dev_path, volume.btrfs_subvols, volume.mount_options)
+		if volume.fs_type == FilesystemType.BTRFS and volume.dev_path:
+			# Only mount BTRFS subvolumes that have mountpoints specified
+			subvols_with_mountpoints = [sv for sv in volume.btrfs_subvols if sv.mountpoint is not None]
+			if subvols_with_mountpoints:
+				self._mount_btrfs_subvol(volume.dev_path, volume.btrfs_subvols, volume.mount_options)
 
 	def _mount_luks_partition(self, part_mod: PartitionModification, luks_handler: Luks2) -> None:
 		if not luks_handler.mapper_dev:
-			return None
+			return
 
-		if part_mod.fs_type == FilesystemType.Btrfs and part_mod.btrfs_subvols:
-			self._mount_btrfs_subvol(luks_handler.mapper_dev, part_mod.btrfs_subvols, part_mod.mount_options)
+		if part_mod.fs_type == FilesystemType.BTRFS and part_mod.btrfs_subvols:
+			# Only mount BTRFS subvolumes that have mountpoints specified
+			subvols_with_mountpoints = [sv for sv in part_mod.btrfs_subvols if sv.mountpoint is not None]
+			if subvols_with_mountpoints:
+				self._mount_btrfs_subvol(luks_handler.mapper_dev, part_mod.btrfs_subvols, part_mod.mount_options)
 		elif part_mod.mountpoint:
 			target = self.target / part_mod.relative_mountpoint
-			device_handler.mount(luks_handler.mapper_dev, target, options=part_mod.mount_options)
+			mount(luks_handler.mapper_dev, target, options=part_mod.mount_options)
 
 	def _mount_luks_volume(self, volume: LvmVolume, luks_handler: Luks2) -> None:
-		if volume.fs_type != FilesystemType.Btrfs:
+		if volume.fs_type != FilesystemType.BTRFS:
 			if volume.mountpoint and luks_handler.mapper_dev:
 				target = self.target / volume.relative_mountpoint
-				device_handler.mount(luks_handler.mapper_dev, target, options=volume.mount_options)
+				mount(luks_handler.mapper_dev, target, options=volume.mount_options)
 
-		if volume.fs_type == FilesystemType.Btrfs and luks_handler.mapper_dev:
-			self._mount_btrfs_subvol(luks_handler.mapper_dev, volume.btrfs_subvols, volume.mount_options)
+		if volume.fs_type == FilesystemType.BTRFS and luks_handler.mapper_dev:
+			# Only mount BTRFS subvolumes that have mountpoints specified
+			subvols_with_mountpoints = [sv for sv in volume.btrfs_subvols if sv.mountpoint is not None]
+			if subvols_with_mountpoints:
+				self._mount_btrfs_subvol(luks_handler.mapper_dev, volume.btrfs_subvols, volume.mount_options)
 
 	def _mount_btrfs_subvol(
 		self,
 		dev_path: Path,
 		subvolumes: list[SubvolumeModification],
-		mount_options: list[str] = [],
+		mount_options: list[str] | None = None,
 	) -> None:
-		for subvol in sorted(subvolumes, key=lambda x: x.relative_mountpoint):
+		if mount_options is None:
+			mount_options = []
+
+		# Filter out subvolumes without mountpoints to avoid errors when sorting
+		subvols_with_mountpoints = [sv for sv in subvolumes if sv.mountpoint is not None]
+		for subvol in sorted(subvols_with_mountpoints, key=lambda x: x.relative_mountpoint):
 			mountpoint = self.target / subvol.relative_mountpoint
 			options = mount_options + [f'subvol={subvol.name}']
-			device_handler.mount(dev_path, mountpoint, options=options)
+			mount(dev_path, mountpoint, options=options)
 
 	def generate_key_files(self) -> None:
 		match self._disk_encryption.encryption_type:
-			case EncryptionType.Luks:
+			case EncryptionType.LUKS:
 				self._generate_key_files_partitions()
-			case EncryptionType.LuksOnLvm:
+			case EncryptionType.LUKS_ON_LVM:
 				self._generate_key_file_lvm_volumes()
-			case EncryptionType.LvmOnLuks:
+			case EncryptionType.LVM_ON_LUKS:
 				# currently LvmOnLuks only supports a single
 				# partitioning layout (boot + partition)
 				# so we won't need any keyfile generation atm
 				pass
 
 	def _generate_key_files_partitions(self) -> None:
+		root_is_encrypted = any(p.is_root() for p in self._disk_encryption.partitions)
+
 		for part_mod in self._disk_encryption.partitions:
 			gen_enc_file = self._disk_encryption.should_generate_encryption_file(part_mod)
 
@@ -428,8 +489,12 @@ class Installer:
 			)
 
 			if gen_enc_file and not part_mod.is_root():
-				debug(f'Creating key-file: {part_mod.dev_path}')
-				luks_handler.create_keyfile(self.target)
+				if root_is_encrypted:
+					debug(f'Creating key-file: {part_mod.dev_path}')
+					luks_handler.create_keyfile(self.target)
+				else:
+					debug(f'Adding passphrase-based crypttab entry for {part_mod.dev_path}')
+					luks_handler.create_crypttab_entry(self.target)
 
 			if part_mod.is_root() and not gen_enc_file:
 				if self._disk_encryption.hsm_device:
@@ -441,6 +506,8 @@ class Installer:
 						)
 
 	def _generate_key_file_lvm_volumes(self) -> None:
+		root_is_encrypted = any(v.is_root() for v in self._disk_encryption.lvm_volumes)
+
 		for vol in self._disk_encryption.lvm_volumes:
 			gen_enc_file = self._disk_encryption.should_generate_encryption_file(vol)
 
@@ -451,8 +518,12 @@ class Installer:
 			)
 
 			if gen_enc_file and not vol.is_root():
-				info(f'Creating key-file: {vol.dev_path}')
-				luks_handler.create_keyfile(self.target)
+				if root_is_encrypted:
+					info(f'Creating key-file: {vol.dev_path}')
+					luks_handler.create_keyfile(self.target)
+				else:
+					info(f'Adding passphrase-based crypttab entry for {vol.dev_path}')
+					luks_handler.create_crypttab_entry(self.target)
 
 			if vol.is_root() and not gen_enc_file:
 				if self._disk_encryption.hsm_device:
@@ -467,12 +538,9 @@ class Installer:
 		# Copy over the install log (if there is one) to the install medium if
 		# at least the base has been strapped in, otherwise we won't have a filesystem/structure to copy to.
 		if self._helper_flags.get('base-strapped', False) is True:
-			absolute_logfile = logger.path
-
-			if not os.path.isdir(f'{self.target}/{os.path.dirname(absolute_logfile)}'):
-				os.makedirs(f'{self.target}/{os.path.dirname(absolute_logfile)}')
-
-			shutil.copy2(absolute_logfile, f'{self.target}/{absolute_logfile}')
+			logfile_target = self.target / LPath(logger.directory).relative_to_root()
+			logfile_target.mkdir(parents=True, exist_ok=True)
+			logger.path.copy_into(logfile_target, preserve_metadata=True)
 
 		return True
 
@@ -510,6 +578,7 @@ class Installer:
 
 	def set_mirrors(
 		self,
+		mirror_list_handler: MirrorListHandler,
 		mirror_config: MirrorConfiguration,
 		on_target: bool = False,
 	) -> None:
@@ -529,9 +598,12 @@ class Installer:
 				if result := plugin.on_mirrors(mirror_config):
 					mirror_config = result
 
-		root = self.target if on_target else Path('/')
-		mirrorlist_config = root / 'etc/pacman.d/mirrorlist'
-		pacman_config = root / 'etc/pacman.conf'
+		if on_target:
+			mirrorlist_config = self.target / MIRRORLIST.relative_to_root()
+			pacman_config = self.target / PACMAN_CONF.relative_to_root()
+		else:
+			mirrorlist_config = MIRRORLIST
+			pacman_config = PACMAN_CONF
 
 		existing_pacman_config = ''
 		if pacman_config.exists():
@@ -544,7 +616,7 @@ class Installer:
 			with open(pacman_config, 'a') as fp:
 				fp.write(repositories_config)
 
-		regions_config = mirror_config.regions_config(speed_sort=True)
+		regions_config = mirror_config.regions_config(mirror_list_handler, speed_sort=True)
 		if regions_config:
 			debug(f'Mirrorlist:\n{regions_config}')
 			mirrorlist_config.write_text(regions_config)
@@ -610,16 +682,12 @@ class Installer:
 		# in the first column of the entry; check for both cases.
 		entry_re = re.compile(rf'#{lang}(\.{encoding})?{modifier} {encoding}')
 
-		lang_value = None
 		for index, line in enumerate(locale_gen_lines):
 			if entry_re.match(line):
-				uncommented_line = line.removeprefix('#')
-				locale_gen_lines[index] = uncommented_line
+				locale_gen_lines[index] = line.removeprefix('#')
 				locale_gen.write_text(''.join(locale_gen_lines))
-				lang_value = uncommented_line.split()[0]
 				break
-
-		if lang_value is None:
+		else:
 			error(f"Invalid locale: language '{locale_config.sys_lang}', encoding '{locale_config.sys_enc}'")
 			return False
 
@@ -629,7 +697,7 @@ class Installer:
 			error(f'Failed to run locale-gen on target: {e}')
 			return False
 
-		(self.target / 'etc/locale.conf').write_text(f'LANG={lang_value}\n')
+		(self.target / 'etc/locale.conf').write_text(f'LANG={lang}.{encoding}{modifier}\n')
 		return True
 
 	def set_timezone(self, zone: str) -> bool:
@@ -682,6 +750,18 @@ class Installer:
 				if hasattr(plugin, 'on_service'):
 					plugin.on_service(service)
 
+	def disable_service(self, services_disable: str | list[str]) -> None:
+		if isinstance(services_disable, str):
+			services_disable = [services_disable]
+
+		for service in services_disable:
+			info(f'Disabling service {service}')
+
+			try:
+				SysCommand(f'systemctl --root={self.target} disable {service}')
+			except SysCallError as err:
+				raise ServiceException(f'Unable to disable service {service}: {err}')
+
 	def run_command(self, cmd: str, peek_output: bool = False) -> SysCommand:
 		return SysCommand(f'arch-chroot -S {self.target} {cmd}', peek_output=peek_output)
 
@@ -690,6 +770,9 @@ class Installer:
 			cmd = f'su - {run_as} -c {shlex.quote(cmd)}'
 
 		return self.run_command(cmd, peek_output=peek_output)
+
+	def _chroot_argv(self, *args: str) -> list[str]:
+		return ['arch-chroot', '-S', str(self.target), *args]
 
 	def drop_to_shell(self) -> None:
 		subprocess.check_call(f'arch-chroot {self.target}', shell=True)
@@ -713,41 +796,53 @@ class Installer:
 		with open(f'{self.target}/etc/systemd/network/10-{nic.iface}.network', 'a') as netconf:
 			netconf.write(str(conf))
 
+	def systemd_resolved_stub_mode(self) -> None:
+		"""
+		Enable systemd-resolved stub mode by (forcefully) setting a symlink
+		For further details see  https://wiki.archlinux.org/title/Systemd-resolved#DNS
+		"""
+		resolv = self.target / 'etc/resolv.conf'
+		resolv.unlink(missing_ok=True)
+		resolv.symlink_to('/run/systemd/resolve/stub-resolv.conf')
+
 	def copy_iso_network_config(self, enable_services: bool = False) -> bool:
 		# Copy (if any) iwd password and config files
-		if os.path.isdir('/var/lib/iwd/'):
-			if psk_files := glob.glob('/var/lib/iwd/*.psk'):
-				if not os.path.isdir(f'{self.target}/var/lib/iwd'):
-					os.makedirs(f'{self.target}/var/lib/iwd')
+		iwd_dir = LPath('/var/lib/iwd')
+		if psk_files := list(iwd_dir.glob('*.psk')):
+			iwd_target = self.target / iwd_dir.relative_to_root()
+			iwd_target.mkdir(parents=True, exist_ok=True)
 
-				if enable_services:
-					# If we haven't installed the base yet (function called pre-maturely)
-					if self._helper_flags.get('base', False) is False:
-						self._base_packages.append('iwd')
+			for psk in psk_files:
+				psk.copy(iwd_target / psk.name, preserve_metadata=True)
 
-						# This function will be called after minimal_installation()
-						# as a hook for post-installs. This hook is only needed if
-						# base is not installed yet.
-						def post_install_enable_iwd_service(*args: str, **kwargs: str) -> None:
-							self.enable_service('iwd')
+			if enable_services:
+				# If we haven't installed the base yet (function called pre-maturely)
+				if self._helper_flags.get('base', False) is False:
+					self._base_packages.append('iwd')
 
-						self.post_base_install.append(post_install_enable_iwd_service)
-					# Otherwise, we can go ahead and add the required package
-					# and enable it's service:
-					else:
-						self.pacman.strap('iwd')
+					# This function will be called after minimal_installation()
+					# as a hook for post-installs. This hook is only needed if
+					# base is not installed yet.
+					def post_install_enable_iwd_service(*args: str, **kwargs: str) -> None:
 						self.enable_service('iwd')
 
-				for psk in psk_files:
-					shutil.copy2(psk, f'{self.target}/var/lib/iwd/{os.path.basename(psk)}')
+					self.post_base_install.append(post_install_enable_iwd_service)
+				# Otherwise, we can go ahead and add the required package
+				# and enable it's service:
+				else:
+					self.pacman.strap('iwd')
+					self.enable_service('iwd')
+
+		self.systemd_resolved_stub_mode()
 
 		# Copy (if any) systemd-networkd config files
-		if netconfigurations := glob.glob('/etc/systemd/network/*'):
-			if not os.path.isdir(f'{self.target}/etc/systemd/network/'):
-				os.makedirs(f'{self.target}/etc/systemd/network/')
+		network_dir = LPath('/etc/systemd/network')
+		if netconfigurations := list(network_dir.glob('*')):
+			network_target = self.target / network_dir.relative_to_root()
+			network_target.mkdir(parents=True, exist_ok=True)
 
 			for netconf_file in netconfigurations:
-				shutil.copy2(netconf_file, f'{self.target}/etc/systemd/network/{os.path.basename(netconf_file)}')
+				netconf_file.copy(network_target / netconf_file.name, preserve_metadata=True)
 
 			if enable_services:
 				# If we haven't installed the base yet (function called pre-maturely)
@@ -964,8 +1059,8 @@ class Installer:
 
 		return sorted_packages
 
-	def apply_install_from_iso(self, users: list[User]) -> None:
-		mode = getattr(arch_config_handler.config, 'install_from_iso_mode', 'configs') or 'configs'
+	def apply_install_from_iso(self, users: list[User], mode: str = 'configs') -> None:
+		mode = mode or 'configs'
 		cfg = self._load_install_from_iso_config(mode)
 		root_cfg = cfg.get('root_home', {})
 		user_cfg = cfg.get('user_home', {})
@@ -988,11 +1083,13 @@ class Installer:
 
 	def _copy_extra_paths(self, entries: list[dict[str, str]]) -> None:
 		for entry in entries:
-			source = Path(entry.get('source', ''))
+			raw_source = entry.get('source', '')
 			destination = entry.get('destination', '')
 
-			if not source or not destination:
+			if not raw_source or not destination:
 				continue
+
+			source = Path(raw_source)
 
 			if not source.exists():
 				debug(f'Extra path {source} missing, skipping')
@@ -1188,10 +1285,7 @@ class Installer:
 		return base
 
 	def _load_install_from_iso_config(self, mode: str = 'configs') -> dict[str, Any]:
-		if not hasattr(self, '_install_from_iso_config_cache'):
-			self._install_from_iso_config_cache = {}  # type: ignore[attr-defined]
-
-		cache: dict[str, dict[str, Any]] = self._install_from_iso_config_cache  # type: ignore[assignment]
+		cache = self._install_from_iso_config_cache
 
 		if mode in cache:
 			return cache[mode]
@@ -1277,7 +1371,7 @@ class Installer:
 			try:
 				self.arch_chroot('pacman -Sy --noconfirm', peek_output=True)
 			except SysCallError as err:
-				if arch_config_handler.args.silent:
+				if self._silent:
 					raise
 				choice = self._prompt_step_action(f'Chaotic AUR sync failed: {err}')
 				if choice == 'retry':
@@ -1288,20 +1382,23 @@ class Installer:
 					warn('Skipping chaotic AUR sync')
 			return
 
+		chaotic_key = '3056513887B78AEB'
+		chaotic_cdn = 'https://cdn-mirror.chaotic.cx/chaotic-aur'
+
 		steps = [
-			('recv-key', lambda: self.arch_chroot('pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com', peek_output=True)),
-			('lsign-key', lambda: self.arch_chroot('pacman-key --lsign-key 3056513887B78AEB', peek_output=True)),
-			('install-keyring', lambda: self.arch_chroot("pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' --noconfirm", peek_output=True)),
-			('install-mirrorlist', lambda: self.arch_chroot("pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' --noconfirm", peek_output=True)),
+			('recv-key', f'pacman-key --recv-key {chaotic_key} --keyserver keyserver.ubuntu.com'),
+			('lsign-key', f'pacman-key --lsign-key {chaotic_key}'),
+			('install-keyring', f"pacman -U '{chaotic_cdn}/chaotic-keyring.pkg.tar.zst' --noconfirm"),
+			('install-mirrorlist', f"pacman -U '{chaotic_cdn}/chaotic-mirrorlist.pkg.tar.zst' --noconfirm"),
 		]
 
-		for key, func in steps:
+		for key, cmd in steps:
 			while True:
 				try:
-					func()
+					_ = self.arch_chroot(cmd, peek_output=True)
 					break
 				except SysCallError as err:
-					if arch_config_handler.args.silent:
+					if self._silent:
 						raise
 					choice = self._prompt_step_action(f'Chaotic AUR step "{key}" failed: {err}')
 					if choice == 'retry':
@@ -1318,7 +1415,7 @@ class Installer:
 			self._add_repo_section('chaotic-aur', 'Include = /etc/pacman.d/chaotic-mirrorlist')
 			self.arch_chroot('pacman -Sy --noconfirm', peek_output=True)
 		except SysCallError as err:
-			if arch_config_handler.args.silent:
+			if self._silent:
 				raise
 			choice = self._prompt_step_action(f'Chaotic AUR repository update failed: {err}')
 			if choice == 'retry':
@@ -1339,7 +1436,7 @@ class Installer:
 				self.arch_chroot('pacman -S yay --noconfirm --needed', peek_output=True)
 				break
 			except SysCallError as err:
-				if arch_config_handler.args.silent:
+				if self._silent:
 					raise
 				choice = self._prompt_step_action(f'Installing yay failed: {err}')
 				if choice == 'retry':
@@ -1392,22 +1489,13 @@ class Installer:
 				return vendor.get_ucode()
 		return None
 
-	def _prepare_fs_type(
-		self,
-		fs_type: FilesystemType,
-		mountpoint: Path | None,
-	) -> None:
+	def _prepare_fs_type(self, fs_type: FilesystemType) -> None:
 		if (pkg := fs_type.installation_pkg) is not None:
 			self._base_packages.append(pkg)
 
 		# https://github.com/archlinux/archinstall/issues/1837
-		if fs_type.fs_type_mount == 'btrfs':
+		if fs_type == FilesystemType.BTRFS:
 			self._disable_fstrim = True
-
-		# There is not yet an fsck tool for NTFS. If it's being used for the root filesystem, the hook should be removed.
-		if fs_type.fs_type_mount == 'ntfs3' and mountpoint == self.target:
-			if 'fsck' in self._hooks:
-				self._hooks.remove('fsck')
 
 	def _prepare_encrypt(self, before: str = 'filesystems') -> None:
 		if self._disk_encryption.hsm_device:
@@ -1422,10 +1510,11 @@ class Installer:
 
 	def minimal_installation(
 		self,
-		optional_repositories: list[Repository] = [],
+		optional_repositories: list[Repository] | None = None,
 		mkinitcpio: bool = True,
 		hostname: str | None = None,
 		locale_config: LocaleConfiguration | None = LocaleConfiguration.default(),
+		pacman_config: PacmanConfiguration | None = None,
 	) -> None:
 		if self._disk_config.lvm_config:
 			lvm = 'lvm2'
@@ -1435,9 +1524,9 @@ class Installer:
 			for vg in self._disk_config.lvm_config.vol_groups:
 				for vol in vg.volumes:
 					if vol.fs_type is not None:
-						self._prepare_fs_type(vol.fs_type, vol.mountpoint)
+						self._prepare_fs_type(vol.fs_type)
 
-			types = (EncryptionType.LvmOnLuks, EncryptionType.LuksOnLvm)
+			types = (EncryptionType.LVM_ON_LUKS, EncryptionType.LUKS_ON_LVM)
 			if self._disk_encryption.encryption_type in types:
 				self._prepare_encrypt(lvm)
 		else:
@@ -1446,7 +1535,7 @@ class Installer:
 					if part.fs_type is None:
 						continue
 
-					self._prepare_fs_type(part.fs_type, part.mountpoint)
+					self._prepare_fs_type(part.fs_type)
 
 					if part in self._disk_encryption.partitions:
 						self._prepare_encrypt()
@@ -1457,6 +1546,9 @@ class Installer:
 		else:
 			debug('Archinstall will not install any ucode.')
 
+		if optional_repositories is None:
+			optional_repositories = []
+
 		debug(f'Optional repositories: {optional_repositories}')
 
 		# This action takes place on the host system as pacstrap copies over package repository lists.
@@ -1464,10 +1556,16 @@ class Installer:
 		pacman_conf.enable(optional_repositories)
 		pacman_conf.apply()
 
+		if locale_config:
+			self.set_vconsole(locale_config)
+
 		self.pacman.strap(self._base_packages)
 		self._helper_flags['base-strapped'] = True
 
 		pacman_conf.persist()
+
+		if pacman_config:
+			pacman_conf.configure(pacman_config)
 
 		# Periodic TRIM may improve the performance and longevity of SSDs whilst
 		# having no adverse effect on other devices. Most distributions enable
@@ -1489,9 +1587,6 @@ class Installer:
 		if locale_config:
 			self.set_locale(locale_config)
 			self.set_keyboard_language(locale_config.kb_layout)
-
-		# TODO: Use python functions for this
-		self.arch_chroot('chmod 700 /root')
 
 		if mkinitcpio and not self.mkinitcpio(['-P']):
 			error('Error generating initramfs (continuing anyway)')
@@ -1522,17 +1617,7 @@ class Installer:
 			}
 
 			for config_name, mountpoint in snapper.items():
-				command = [
-					'arch-chroot',
-					'-S',
-					str(self.target),
-					'snapper',
-					'--no-dbus',
-					'-c',
-					config_name,
-					'create-config',
-					mountpoint,
-				]
+				command = self._chroot_argv('snapper', '--no-dbus', '-c', config_name, 'create-config', mountpoint)
 
 				try:
 					SysCommand(command, peek_output=True)
@@ -1556,22 +1641,19 @@ class Installer:
 			self._configure_grub_btrfsd(snapshot_type)
 			self.enable_service('grub-btrfsd.service')
 
-	def setup_swap(self, kind: str = 'zram') -> None:
-		if kind == 'zram':
-			info('Setting up swap on zram')
-			self.pacman.strap('zram-generator')
+	def setup_swap(self, algo: ZramAlgorithm = ZramAlgorithm.ZSTD) -> None:
+		info('Setting up swap on zram')
+		self.pacman.strap('zram-generator')
 
-			# We could use the default example below, but maybe not the best idea: https://github.com/archlinux/archinstall/pull/678#issuecomment-962124813
-			# zram_example_location = '/usr/share/doc/zram-generator/zram-generator.conf.example'
-			# shutil.copy2(f"{self.target}{zram_example_location}", f"{self.target}/usr/lib/systemd/zram-generator.conf")
-			with open(f'{self.target}/etc/systemd/zram-generator.conf', 'w') as zram_conf:
-				zram_conf.write('[zram0]\n')
+		info(f'Zram compression algorithm: {algo.value}')
 
-			self.enable_service('systemd-zram-setup@zram0.service')
+		with open(f'{self.target}/etc/systemd/zram-generator.conf', 'w') as zram_conf:
+			zram_conf.write('[zram0]\n')
+			zram_conf.write(f'compression-algorithm = {algo.value}\n')
 
-			self._zram_enabled = True
-		else:
-			raise ValueError('Archinstall currently only supports setting up swap on zram')
+		self.enable_service('systemd-zram-setup@zram0.service')
+
+		self._zram_enabled = True
 
 	def _get_efi_partition(self) -> PartitionModification | None:
 		for layout in self._disk_config.device_modifications:
@@ -1604,7 +1686,7 @@ class Installer:
 
 		debug(f'Configuring grub-btrfsd service for {snapshot_type} at {snapshot_path}')
 
-		# Works for either snapper or ts just adpating default paths above
+		# Works for either snapper or ts just adapting default paths above
 		# https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html#id-1.14.3
 		systemd_dir = self.target / 'etc/systemd/system/grub-btrfsd.service.d'
 		systemd_dir.mkdir(parents=True, exist_ok=True)
@@ -1640,7 +1722,7 @@ class Installer:
 
 		if root_partition in self._disk_encryption.partitions:
 			# TODO: We need to detect if the encrypted device is a whole disk encryption,
-			#       or simply a partition encryption. Right now we assume it's a partition (and we always have)
+			# or simply a partition encryption. Right now we assume it's a partition (and we always have)
 
 			if self._disk_encryption.hsm_device:
 				debug(f'Root partition is an encrypted device, identifying by UUID: {root_partition.uuid}')
@@ -1675,11 +1757,11 @@ class Installer:
 		kernel_parameters = []
 
 		match self._disk_encryption.encryption_type:
-			case EncryptionType.LvmOnLuks:
+			case EncryptionType.LVM_ON_LUKS:
 				if not lvm.vg_name:
 					raise ValueError(f'Unable to determine VG name for {lvm.name}')
 
-				pv_seg_info = device_handler.lvm_pvseg_info(lvm.vg_name, lvm.name)
+				pv_seg_info = lvm_pvseg_info(lvm.vg_name, lvm.name)
 
 				if not pv_seg_info:
 					raise ValueError(f'Unable to determine PV segment info for {lvm.vg_name}/{lvm.name}')
@@ -1692,7 +1774,7 @@ class Installer:
 				else:
 					debug(f'LvmOnLuks, encrypted root partition, identifying by UUID: {uuid}')
 					kernel_parameters.append(f'cryptdevice=UUID={uuid}:cryptlvm root={lvm.safe_dev_path}')
-			case EncryptionType.LuksOnLvm:
+			case EncryptionType.LUKS_ON_LVM:
 				uuid = self._get_luks_uuid_from_mapper_dev(lvm.mapper_path)
 
 				if self._disk_encryption.hsm_device:
@@ -1701,7 +1783,7 @@ class Installer:
 				else:
 					debug(f'LuksOnLvm, encrypted root partition, identifying by UUID: {uuid}')
 					kernel_parameters.append(f'cryptdevice=UUID={uuid}:root root=/dev/mapper/root')
-			case EncryptionType.NoEncryption:
+			case EncryptionType.NO_ENCRYPTION:
 				debug(f'Identifying root lvm by mapper device: {lvm.dev_path}')
 				kernel_parameters.append(f'root={lvm.safe_dev_path}')
 
@@ -1733,7 +1815,7 @@ class Installer:
 
 			kernel_parameters.append('rw')
 
-		kernel_parameters.append(f'rootfstype={root.safe_fs_type.fs_type_mount}')
+		kernel_parameters.append(f'rootfstype={root.safe_fs_type.value}')
 		kernel_parameters.extend(self._kernel_params)
 
 		debug(f'kernel parameters: {" ".join(kernel_parameters)}')
@@ -1756,9 +1838,9 @@ class Installer:
 			f"""\
 			# Created by: archinstall
 			# Created on: {self.init_time}
-			title   Arch Linux ({{kernel}})
-			linux   /vmlinuz-{{kernel}}
-			initrd  /initramfs-{{kernel}}.img
+			title	Arch Linux ({{kernel}})
+			linux	/vmlinuz-{{kernel}}
+			initrd	/initramfs-{{kernel}}.img
 			options {' '.join(self._get_kernel_params(root))}
 			""",
 		)
@@ -1809,7 +1891,7 @@ class Installer:
 
 		try:
 			# Force EFI variables since bootctl detects arch-chroot
-			# as a container environemnt since v257 and skips them silently.
+			# as a container environment since v257 and skips them silently.
 			# https://github.com/systemd/systemd/issues/36174
 			if systemd_version >= '258':
 				self.arch_chroot(f'bootctl --variables=yes {" ".join(bootctl_options)} install')
@@ -1863,31 +1945,18 @@ class Installer:
 		boot_partition: PartitionModification,
 		root: PartitionModification | LvmVolume,
 		efi_partition: PartitionModification | None,
+		uki_enabled: bool = False,
 		bootloader_removable: bool = False,
 	) -> None:
 		debug('Installing grub bootloader')
 
 		self.pacman.strap('grub')
 
-		grub_default = self.target / 'etc/default/grub'
-		config = grub_default.read_text()
-
-		kernel_parameters = ' '.join(self._get_kernel_params(root, False, False))
-		config = re.sub(r'(GRUB_CMDLINE_LINUX=")("\n)', rf'\1{kernel_parameters}\2', config, count=1)
-
-		grub_default.write_text(config)
-
 		info(f'GRUB boot partition: {boot_partition.dev_path}')
 
 		boot_dir = Path('/boot')
 
-		command = [
-			'arch-chroot',
-			'-S',
-			str(self.target),
-			'grub-install',
-			'--debug',
-		]
+		command = self._chroot_argv('grub-install', '--debug')
 
 		if SysInfo.has_uefi():
 			if not efi_partition:
@@ -1903,7 +1972,7 @@ class Installer:
 				boot_dir = boot_partition.mountpoint
 
 			add_options = [
-				f'--target={platform.machine()}-efi',
+				f'--target={"arm64" if platform.machine() == "aarch64" else platform.machine()}-efi',
 				f'--efi-directory={efi_partition.mountpoint}',
 				*boot_dir_arg,
 				'--bootloader-id=GRUB',
@@ -1917,18 +1986,11 @@ class Installer:
 			try:
 				SysCommand(command, peek_output=True)
 			except SysCallError as err:
-				if not bootloader_removable:
-					command.append('--removable')
-					try:
-						SysCommand(command, peek_output=True)
-					except SysCallError:
-						pass
-
-				raise DiskError(f'Could not install GRUB to {self.target}{efi_partition.mountpoint}: {err}') from err
+				raise DiskError(f'Could not install GRUB to {self.target}{efi_partition.mountpoint}: {err}')
 		else:
 			info(f'GRUB boot partition: {boot_partition.dev_path}')
 
-			parent_dev_path = device_handler.get_parent_device_path(boot_partition.safe_dev_path)
+			parent_dev_path = get_parent_device_path(boot_partition.safe_dev_path)
 
 			add_options = [
 				'--target=i386-pc',
@@ -1940,6 +2002,49 @@ class Installer:
 				SysCommand(command + add_options, peek_output=True)
 			except SysCallError as err:
 				raise DiskError(f'Failed to install GRUB boot on {boot_partition.dev_path}: {err}')
+
+		if SysInfo.has_uefi() and uki_enabled:
+			grub_d = LPath(self.target) / 'etc/grub.d'
+			linux_file = grub_d / '10_linux'
+			uki_file = grub_d / '15_uki'
+
+			raw_str_platform = r'\$grub_platform'
+			space_indent_cmd = '  uki'
+			content = textwrap.dedent(
+				f"""\
+				#! /bin/sh
+				set -e
+
+				cat << EOF
+				if [ "{raw_str_platform}" = "efi" ]; then
+				{space_indent_cmd}
+				fi
+				EOF
+				""",
+			)
+
+			try:
+				uki_file.write_text(content)
+				uki_file.add_exec()
+				linux_file.remove_exec()
+			except OSError:
+				error('Failed to enable UKI menu entries')
+		else:
+			grub_default = self.target / 'etc/default/grub'
+			config = grub_default.read_text()
+
+			kernel_parameters = ' '.join(
+				self._get_kernel_params(root, id_root=False, partuuid=False),
+			)
+			config = re.sub(
+				r'^(GRUB_CMDLINE_LINUX=")(")$',
+				rf'\1{kernel_parameters}\2',
+				config,
+				count=1,
+				flags=re.MULTILINE,
+			)
+
+			grub_default.write_text(config)
 
 		try:
 			self.arch_chroot(
@@ -1976,36 +2081,44 @@ class Installer:
 			elif not efi_partition.mountpoint:
 				raise ValueError('EFI partition is not mounted')
 
+			# Safety net for programmatic callers that bypass GlobalMenu and
+			# guided.py validation.
+			if failure := validate_bootloader_layout(
+				BootloaderConfiguration(bootloader=Bootloader.Limine, uki=uki_enabled),
+				self._disk_config,
+			):
+				raise DiskError(failure.description)
+
 			info(f'Limine EFI partition: {efi_partition.dev_path}')
 
-			parent_dev_path = device_handler.get_parent_device_path(efi_partition.safe_dev_path)
+			parent_dev_path = get_parent_device_path(efi_partition.safe_dev_path)
+
+			efi_dir_path = self.target / efi_partition.mountpoint.relative_to('/') / 'EFI'
+			efi_dir_path_target = efi_partition.mountpoint / 'EFI'
+			if bootloader_removable:
+				efi_dir_path = efi_dir_path / 'BOOT'
+				efi_dir_path_target = efi_dir_path_target / 'BOOT'
+			else:
+				efi_dir_path = efi_dir_path / 'arch-limine'
+				efi_dir_path_target = efi_dir_path_target / 'arch-limine'
+
+			config_path = efi_dir_path / 'limine.conf'
+
+			efi_dir_path.mkdir(parents=True, exist_ok=True)
+
+			efi_binaries: tuple[str, ...]
+			if platform.machine() == 'aarch64':
+				efi_binaries = ('BOOTAA64.EFI',)
+			else:
+				efi_binaries = ('BOOTIA32.EFI', 'BOOTX64.EFI')
 
 			try:
-				efi_dir_path = self.target / efi_partition.mountpoint.relative_to('/') / 'EFI'
-				efi_dir_path_target = efi_partition.mountpoint / 'EFI'
-				if bootloader_removable:
-					efi_dir_path = efi_dir_path / 'BOOT'
-					efi_dir_path_target = efi_dir_path_target / 'BOOT'
-
-					boot_limine_path = self.target / 'boot' / 'limine'
-					boot_limine_path.mkdir(parents=True, exist_ok=True)
-					config_path = boot_limine_path / 'limine.conf'
-				else:
-					efi_dir_path = efi_dir_path / 'arch-limine'
-					efi_dir_path_target = efi_dir_path_target / 'arch-limine'
-
-					config_path = efi_dir_path / 'limine.conf'
-
-				efi_dir_path.mkdir(parents=True, exist_ok=True)
-
-				for file in ('BOOTIA32.EFI', 'BOOTX64.EFI'):
-					shutil.copy(limine_path / file, efi_dir_path)
+				for file in efi_binaries:
+					(limine_path / file).copy_into(efi_dir_path)
 			except Exception as err:
 				raise DiskError(f'Failed to install Limine in {self.target}{efi_partition.mountpoint}: {err}')
 
-			hook_command = (
-				f'/usr/bin/cp /usr/share/limine/BOOTIA32.EFI {efi_dir_path_target}/ && /usr/bin/cp /usr/share/limine/BOOTX64.EFI {efi_dir_path_target}/'
-			)
+			hook_command = ' && '.join(f'/usr/bin/cp /usr/share/limine/{file} {efi_dir_path_target}/' for file in efi_binaries)
 
 			if not bootloader_removable:
 				# Create EFI boot menu entry for Limine.
@@ -2016,7 +2129,7 @@ class Installer:
 					raise OSError(f'Could not open or read /sys/firmware/efi/fw_platform_size to determine EFI bitness: {err}')
 
 				if efi_bitness == '64':
-					loader_path = '\\EFI\\arch-limine\\BOOTX64.EFI'
+					loader_path = f'\\EFI\\arch-limine\\{"BOOTAA64.EFI" if platform.machine() == "aarch64" else "BOOTX64.EFI"}'
 				elif efi_bitness == '32':
 					loader_path = '\\EFI\\arch-limine\\BOOTIA32.EFI'
 				else:
@@ -2041,14 +2154,14 @@ class Installer:
 
 			config_path = boot_limine_path / 'limine.conf'
 
-			parent_dev_path = device_handler.get_parent_device_path(boot_partition.safe_dev_path)
+			parent_dev_path = get_parent_device_path(boot_partition.safe_dev_path)
 
-			if unique_path := device_handler.get_unique_path_for_device(parent_dev_path):
+			if unique_path := get_unique_path_for_device(parent_dev_path):
 				parent_dev_path = unique_path
 
 			try:
 				# The `limine-bios.sys` file contains stage 3 code.
-				shutil.copy(limine_path / 'limine-bios.sys', boot_limine_path)
+				(limine_path / 'limine-bios.sys').copy_into(boot_limine_path)
 
 				# `limine bios-install` deploys the stage 1 and 2 to the
 				self.arch_chroot(f'limine bios-install {parent_dev_path}', peek_output=True)
@@ -2093,7 +2206,7 @@ class Installer:
 					f'cmdline: {kernel_params}',
 				]
 				config_contents += f'\n/Arch Linux ({kernel})\n'
-				config_contents += '\n'.join([f'    {it}' for it in entry]) + '\n'
+				config_contents += '\n'.join(f'    {it}' for it in entry) + '\n'
 			else:
 				entry = [
 					'protocol: linux',
@@ -2102,7 +2215,7 @@ class Installer:
 					f'module_path: {path_root}:/initramfs-{kernel}.img',
 				]
 				config_contents += f'\n/Arch Linux ({kernel})\n'
-				config_contents += '\n'.join([f'    {it}' for it in entry]) + '\n'
+				config_contents += '\n'.join(f'    {it}' for it in entry) + '\n'
 
 		config_path.write_text(config_contents)
 
@@ -2127,9 +2240,9 @@ class Installer:
 
 		if not uki_enabled:
 			loader = '/vmlinuz-{kernel}'
-
+			# EFI standards stipulate backslashes
 			entries = (
-				'initrd=/initramfs-{kernel}.img',
+				r'initrd=\initramfs-{kernel}.img',
 				*self._get_kernel_params(root),
 			)
 
@@ -2138,7 +2251,7 @@ class Installer:
 			loader = '/EFI/Linux/arch-{kernel}.efi'
 			cmdline = []
 
-		parent_dev_path = device_handler.get_parent_device_path(boot_partition.safe_dev_path)
+		parent_dev_path = get_parent_device_path(boot_partition.safe_dev_path)
 
 		cmd_template = (
 			'efibootmgr',
@@ -2163,10 +2276,132 @@ class Installer:
 
 		self._helper_flags['bootloader'] = 'efistub'
 
+	def _add_refind_bootloader(
+		self,
+		boot_partition: PartitionModification,
+		efi_partition: PartitionModification | None,
+		root: PartitionModification | LvmVolume,
+		uki_enabled: bool = False,
+	) -> None:
+		debug('Installing rEFInd bootloader')
+
+		self.pacman.strap('refind')
+
+		if not SysInfo.has_uefi():
+			raise HardwareIncompatibilityError
+
+		info(f'rEFInd boot partition: {boot_partition.dev_path}')
+
+		if not efi_partition:
+			raise ValueError('Could not detect EFI system partition')
+		elif not efi_partition.mountpoint:
+			raise ValueError('EFI system partition is not mounted')
+
+		info(f'rEFInd EFI partition: {efi_partition.dev_path}')
+
+		try:
+			self.arch_chroot('refind-install')
+		except SysCallError as err:
+			raise DiskError(f'Could not install rEFInd to {self.target}{efi_partition.mountpoint}: {err}')
+
+		if not boot_partition.mountpoint:
+			raise ValueError('Boot partition is not mounted, cannot write rEFInd config')
+
+		boot_is_separate = boot_partition != efi_partition and boot_partition.dev_path != efi_partition.dev_path
+
+		if boot_is_separate:
+			# Separate boot partition (not ESP, not root)
+			config_path = self.target / boot_partition.mountpoint.relative_to('/') / 'refind_linux.conf'
+			boot_on_root = False
+		elif efi_partition.mountpoint == Path('/boot'):
+			# ESP is mounted at /boot, kernels are on ESP
+			config_path = self.target / 'boot' / 'refind_linux.conf'
+			boot_on_root = False
+		else:
+			# ESP is elsewhere (/efi, /boot/efi, etc.), kernels are on root filesystem at /boot
+			config_path = self.target / 'boot' / 'refind_linux.conf'
+			boot_on_root = True
+
+		config_contents = []
+
+		kernel_params = ' '.join(self._get_kernel_params(root))
+
+		for kernel in self.kernels:
+			if uki_enabled:
+				entry = f'"Arch Linux ({kernel}) UKI" "{kernel_params}"'
+			else:
+				if boot_on_root:
+					# Kernels are in /boot subdirectory of root filesystem
+					if hasattr(root, 'btrfs_subvols') and root.btrfs_subvols:
+						# Root is btrfs with subvolume, find the root subvolume
+						root_subvol = next((sv for sv in root.btrfs_subvols if sv.is_root()), None)
+						if root_subvol:
+							subvol_name = root_subvol.name
+							initrd_path = f'initrd={subvol_name}\\boot\\initramfs-{kernel}.img'
+						else:
+							initrd_path = f'initrd=\\boot\\initramfs-{kernel}.img'
+					else:
+						# Root without btrfs subvolume
+						initrd_path = f'initrd=\\boot\\initramfs-{kernel}.img'
+				else:
+					# Kernels are at root of their partition (ESP or separate boot partition)
+					initrd_path = f'initrd=\\initramfs-{kernel}.img'
+				entry = f'"Arch Linux ({kernel})" "{kernel_params} {initrd_path}"'
+
+			config_contents.append(entry)
+
+		config_path.write_text('\n'.join(config_contents) + '\n')
+
+		hook_contents = textwrap.dedent(
+			"""\
+			[Trigger]
+			Operation = Install
+			Operation = Upgrade
+			Type = Package
+			Target = refind
+
+			[Action]
+			Description = Updating rEFInd on ESP
+			When = PostTransaction
+			Exec = /usr/bin/refind-install
+			"""
+		)
+
+		hooks_dir = self.target / 'etc' / 'pacman.d' / 'hooks'
+		hooks_dir.mkdir(parents=True, exist_ok=True)
+
+		hook_path = hooks_dir / '99-refind.hook'
+		hook_path.write_text(hook_contents)
+
+		self._helper_flags['bootloader'] = 'refind'
+
+	def _install_plymouth(self, plymouth: PlymouthTheme) -> None:
+		debug(f'Installing plymouth with theme: {plymouth.value}')
+		self.add_additional_packages(['plymouth'])
+
+		for param in ('quiet', 'splash'):
+			if param not in self._kernel_params:
+				self._kernel_params.append(param)
+
+		if 'plymouth' not in self._hooks:
+			for hook, insert_after in [('encrypt', False), ('sd-encrypt', False), ('systemd', True), ('filesystems', False), ('keyboard', True)]:
+				try:
+					idx = self._hooks.index(hook)
+					self._hooks.insert(idx + (1 if insert_after else 0), 'plymouth')
+					break
+				except ValueError:
+					continue
+			else:
+				self._hooks.append('plymouth')
+
+		self.arch_chroot(f'plymouth-set-default-theme {plymouth.value}')
+		self.mkinitcpio(['-P'])
+
 	def _config_uki(
 		self,
 		root: PartitionModification | LvmVolume,
 		efi_partition: PartitionModification | None,
+		keep_initramfs: bool = False,
 	) -> None:
 		if not efi_partition or not efi_partition.mountpoint:
 			raise ValueError(f'Could not detect ESP at mountpoint {self.target}')
@@ -2190,11 +2425,11 @@ class Installer:
 			config = preset.read_text().splitlines(True)
 
 			for index, line in enumerate(config):
-				# Avoid storing redundant image file
 				if m := image_re.match(line):
-					image = self.target / m.group(2)
-					image.unlink(missing_ok=True)
-					config[index] = '#' + m.group(1)
+					if not keep_initramfs:
+						image = self.target / m.group(2)
+						image.unlink(missing_ok=True)
+						config[index] = '#' + m.group(1)
 				elif m := uki_re.match(line):
 					if diff_mountpoint:
 						config[index] = m.group(2) + diff_mountpoint + m.group(3)
@@ -2213,24 +2448,28 @@ class Installer:
 		if not self.mkinitcpio(['-P']):
 			error('Error generating initramfs (continuing anyway)')
 
-	def add_bootloader(self, bootloader: Bootloader, uki_enabled: bool = False, bootloader_removable: bool = False) -> None:
+	def add_bootloader(
+		self, bootloader: Bootloader, uki_enabled: bool = False, bootloader_removable: bool = False, plymouth: PlymouthTheme | None = None
+	) -> None:
 		"""
 		Adds a bootloader to the installation instance.
-		Archinstall supports one of three types:
+		Archinstall supports one of five types:
 		* systemd-bootctl
 		* grub
 		* limine
 		* efistub (beta)
+		* refnd (beta)
 
 		:param bootloader: Type of bootloader to be added
 		:param uki_enabled: Whether to use unified kernel images
 		:param bootloader_removable: Whether to install to removable media location (UEFI only, for GRUB and Limine)
+		:param plymouth: Optional Plymouth theme to install and configure
 		"""
 
 		for plugin in plugins.values():
 			if hasattr(plugin, 'on_add_bootloader'):
 				# Allow plugins to override the boot-loader handling.
-				# This allows for bot configuring and installing bootloaders.
+				# This allows for boot configuring and installing bootloaders.
 				if plugin.on_add_bootloader(self):
 					return
 
@@ -2260,18 +2499,29 @@ class Installer:
 				warn(f'Bootloader {bootloader.value} lacks removable support; disabling.')
 				bootloader_removable = False
 
+		if plymouth is not None:
+			self._install_plymouth(plymouth)
+
 		if uki_enabled:
-			self._config_uki(root, efi_partition)
+			keep_initramfs = (
+				bootloader == Bootloader.Grub
+				and self._disk_config.has_default_btrfs_vols()
+				and self._disk_config.btrfs_options is not None
+				and self._disk_config.btrfs_options.snapshot_config is not None
+			)
+			self._config_uki(root, efi_partition, keep_initramfs)
 
 		match bootloader:
 			case Bootloader.Systemd:
 				self._add_systemd_bootloader(boot_partition, root, efi_partition, uki_enabled)
 			case Bootloader.Grub:
-				self._add_grub_bootloader(boot_partition, root, efi_partition, bootloader_removable)
+				self._add_grub_bootloader(boot_partition, root, efi_partition, uki_enabled, bootloader_removable)
 			case Bootloader.Efistub:
 				self._add_efistub_bootloader(boot_partition, root, uki_enabled)
 			case Bootloader.Limine:
 				self._add_limine_bootloader(boot_partition, efi_partition, root, uki_enabled, bootloader_removable)
+			case Bootloader.Refind:
+				self._add_refind_bootloader(boot_partition, efi_partition, root, uki_enabled)
 
 	def add_additional_packages(self, packages: str | list[str]) -> None:
 		return self.pacman.strap(packages)
@@ -2325,16 +2575,17 @@ class Installer:
 		if not handled_by_plugin:
 			info(f'Creating user {user.username}')
 
-			cmd = 'useradd -m'
+			cmd = self._chroot_argv('useradd', '-m')
 
 			if user.sudo:
-				cmd += ' -G wheel'
+				cmd += ['-G', 'wheel']
 
-			cmd += f' {user.username}'
+			cmd += ['--', user.username]
 
 			try:
-				self.arch_chroot(cmd)
-			except SysCallError as err:
+				run(cmd)
+			except CalledProcessError as err:
+				debug(f'Error creating user {user.username}: {err}')
 				raise SystemError(f'Could not create user inside installation: {err}')
 
 		for plugin in plugins.values():
@@ -2345,7 +2596,11 @@ class Installer:
 		self.set_user_password(user)
 
 		for group in user.groups:
-			self.arch_chroot(f'gpasswd -a {user.username} {group}')
+			cmd = self._chroot_argv('gpasswd', '-a', user.username, group)
+			try:
+				run(cmd)
+			except CalledProcessError as err:
+				warn(f'Failed to add {user.username} to group {group}: {err}')
 
 		if user.sudo:
 			self.enable_sudo(user)
@@ -2360,7 +2615,7 @@ class Installer:
 			return False
 
 		input_data = f'{user.username}:{enc_password}'.encode()
-		cmd = ['arch-chroot', '-S', str(self.target), 'chpasswd', '--encrypted']
+		cmd = self._chroot_argv('chpasswd', '--encrypted')
 
 		try:
 			run(cmd, input_data=input_data)
@@ -2372,19 +2627,44 @@ class Installer:
 	def user_set_shell(self, user: str, shell: str) -> bool:
 		info(f'Setting shell for {user} to {shell}')
 
+		cmd = self._chroot_argv('chsh', '-s', shell, user)
 		try:
-			self.arch_chroot(f'sh -c "chsh -s {shell} {user}"')
+			run(cmd)
 			return True
-		except SysCallError:
+		except CalledProcessError as err:
+			debug(f'Error setting user shell: {err}')
 			return False
 
-	def chown(self, owner: str, path: str, options: list[str] = []) -> bool:
-		cleaned_path = path.replace("'", "\\'")
+	def chown(self, owner: str, path: str, options: list[str] | None = None) -> bool:
+		options = options or []
+		cmd = self._chroot_argv('chown', *options, '--', owner, path)
 		try:
-			self.arch_chroot(f"sh -c 'chown {' '.join(options)} {owner} {cleaned_path}'")
+			run(cmd)
 			return True
-		except SysCallError:
+		except CalledProcessError as err:
+			debug(f'Error changing ownership of {path}: {err}')
 			return False
+
+	def set_vconsole(self, locale_config: LocaleConfiguration) -> None:
+		# use the already set kb layout
+		kb_vconsole: str = locale_config.kb_layout
+		font_vconsole = locale_config.console_font
+
+		if font_vconsole.startswith('ter-'):
+			self.pacman.strap(['terminus-font'])
+
+		# Ensure /etc exists
+		vconsole_dir: Path = self.target / 'etc'
+		vconsole_dir.mkdir(parents=True, exist_ok=True)
+		vconsole_path: Path = vconsole_dir / 'vconsole.conf'
+
+		# Write both KEYMAP and FONT to vconsole.conf
+		vconsole_content = f'KEYMAP={kb_vconsole}\n'
+		# Corrects another warning
+		vconsole_content += f'FONT={font_vconsole}\n'
+
+		vconsole_path.write_text(vconsole_content)
+		info(f'Wrote to {vconsole_path} using {kb_vconsole} and {font_vconsole}')
 
 	def set_keyboard_language(self, language: str) -> bool:
 		info(f'Setting keyboard language to {language}')
@@ -2396,10 +2676,8 @@ class Installer:
 
 			# In accordance with https://github.com/archlinux/archinstall/issues/107#issuecomment-841701968
 			# Setting an empty keymap first, allows the subsequent call to set layout for both console and x11.
-			from .boot import Boot
-
-			with Boot(self) as session:
-				os.system('systemd-run --machine=archinstall --pty localectl set-keymap ""')
+			with Boot(self.target) as session:
+				os.system('systemd-run --machine=archinstall --pty localectl set-keymap ""')  # type: ignore[deprecated]
 
 				try:
 					session.SysCommand(['localectl', 'set-keymap', language])
@@ -2424,9 +2702,7 @@ class Installer:
 				error(f'Invalid x11-keyboard language specified: {language}')
 				return False
 
-			from .boot import Boot
-
-			with Boot(self) as session:
+			with Boot(self.target) as session:
 				session.SysCommand(['localectl', 'set-x11-keymap', '""'])
 
 				try:
@@ -2467,18 +2743,17 @@ class Installer:
 
 
 def accessibility_tools_in_use() -> bool:
-	return os.system('systemctl is-active --quiet espeakup.service') == 0
+	return os.system('systemctl is-active --quiet espeakup.service') == 0  # type: ignore[deprecated]
 
 
 def run_custom_user_commands(commands: list[str], installation: Installer) -> None:
 	for index, command in enumerate(commands):
-		script_path = f'/var/tmp/user-command.{index}.sh'
-		chroot_path = f'{installation.target}/{script_path}'
+		script_path = LPath(f'/var/tmp/user-command.{index}.sh')
+		chroot_path = installation.target / script_path.relative_to_root()
 
 		info(f'Executing custom command "{command}" ...')
-		with open(chroot_path, 'w') as user_script:
-			user_script.write(command)
+		chroot_path.write_text(command)
 
 		SysCommand(f'arch-chroot -S {installation.target} bash {script_path}')
 
-		os.unlink(chroot_path)
+		chroot_path.unlink()

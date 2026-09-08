@@ -26,19 +26,19 @@ msgid "Do you really want to abort?"
 msgstr "هل تُريدُ حقًا إجهاضَ العَملِيَّة؟"
 
 msgid "And one more time for verification: "
-msgstr "ومرة أخرى للتحقق: "
+msgstr "ومرة أخرى للتّحقّق: "
 
 msgid "Would you like to use swap on zram?"
 msgstr "هل تريد استخدام swap أو zram؟"
 
 msgid "Desired hostname for the installation: "
-msgstr "اسم المضيف المُراد للتثبيت: "
+msgstr "اسم الحاسوب المُراد للتّثبيت:"
 
 msgid "Username for required superuser with sudo privileges: "
 msgstr "اسم المتستخدم لأجل المستخدم الخارِق المطلوب مع امتيازات sudo: "
 
 msgid "Any additional users to install (leave blank for no users): "
-msgstr "أي مستخدمين إضافيين للتثبيت (اتركه فارغًا لعدم وجود مستخدمين): "
+msgstr "أيّ مستخدمين إضافيّين للتّثبيت (اتركه فارغًا لعدم وجود مستخدمين): "
 
 msgid "Should this user be a superuser (sudoer)?"
 msgstr "هل يجب أن يكون هذا المستخدم خارقا (sudoer)؟"
@@ -58,27 +58,30 @@ msgstr "اختر خادِم صوتيات"
 msgid "Only packages such as base, base-devel, linux, linux-firmware, efibootmgr and optional profile packages are installed."
 msgstr "فقط الحزم مثل base وbase-devel وlinux وlinux-firmware وefibootmgr و حِزم مِلف اختيارية سوف تُثَبَّت."
 
+msgid "Note: base-devel is no longer installed by default. Add it here if you need build tools."
+msgstr "ملاحظة: لم يعد base-devel مثبتًا بشكل أصلي. أضفه هنا إذا كنت بحاجة إلى أدوات البناء."
+
 msgid "If you desire a web browser, such as firefox or chromium, you may specify it in the following prompt."
-msgstr "إذا كنت ترغب في متصفح الويب ، مثل Firefox أو chromium، فيمكنك تحديده في موضِع الكتابة التالي."
+msgstr "إذا كنت ترغب في متصفح Web، مثل Firefox أو Chromium، فيمكنك تحديده في موضِع الكتابة التالي."
 
 msgid "Write additional packages to install (space separated, leave blank to skip): "
 msgstr "اكتب حزمًا إضافية لتثبيتها (تُفصَل بالمسافات، اتركها فارغة للتخطي): "
 
 msgid "Copy ISO network configuration to installation"
-msgstr "انسخ إعداد شبكة الـISO للتثبيت"
+msgstr "انسخ إعداد شبكة ISO للتّثبيت"
 
 msgid "Use NetworkManager (necessary for configuring internet graphically in GNOME and KDE)"
-msgstr "استخدم مُدير الشبكة (ضروري لإعداد الإنترنت باستخدام واجهة رسومية في جنوم و كيدي)"
+msgstr "استخدم NetworkManager (ضروري لإعداد الإنترنت باستخدام واجهة رسومية في جنوم و كيدي)"
 
 msgid "Select one network interface to configure"
-msgstr "حدِّد واجهة شبكة واحدة للإعداد"
+msgstr "حدِّد ربط شبكة واحد للإعداد"
 
 msgid "Select which mode to configure for \"{}\" or skip to use default mode \"{}\""
-msgstr "حدد الوضع المراد تهيئته لـ\"{}\" أو تخطى لاستخدام الوضع الافتراضي \"{}\""
+msgstr "حدّد الوضع المراد تهيئته لـ\"{}\" أو تخطى لاستخدام الوضع الأصلي \"{}\""
 
 #, python-brace-format
 msgid "Enter the IP and subnet for {} (example: 192.168.0.5/24): "
-msgstr "أدخِل الIP مع تجزئة الشبكة لـ{} (على سبيل المثال: 192.168.0.5/24): "
+msgstr "أدخِل الـ IP و تجزئة الشّبكة لـ {} (مثالا: 192.168.0.5/24): "
 
 msgid "Enter your gateway (router) IP address or leave blank for none: "
 msgstr "أدخل عنوان IP الخاص بالبوابة (جهاز التوجيه) أو اتركه فارغاً لعدم وجود عنوان IP: "
@@ -87,20 +90,20 @@ msgid "Enter your DNS servers (space separated, blank for none): "
 msgstr "أدخل خوادم DNS الخاصة بك (يجب أن تكون مفصولة بمسافات، أو فارغة في حالة عدم وجود خوادم): "
 
 msgid "Select which filesystem your main partition should use"
-msgstr "حدد نظام الملفات الذي يجب أن يستخدمه القسم الرئيسي الخاص بك"
+msgstr "حدّد نظام الملفّات الذي يجب أن يستخدمه التّقسيم الرّئيسي الخاص بك"
 
 msgid "Current partition layout"
-msgstr "تخطيط القسم الحالي"
+msgstr "تخطيط التّقسيم الحالي"
 
 msgid ""
 "Select what to do with\n"
 "{}"
 msgstr ""
-"حدد ما يجب القيام به باستخدام\n"
+"حدّد ما يجب القيام به باستخدام\n"
 "{}"
 
 msgid "Enter a desired filesystem type for the partition"
-msgstr "إدخال نوع نظام الملفات المطلوب للقسم"
+msgstr "إدخال نوع نظام الملفّات المطلوب للتّقسيم"
 
 msgid "Enter the start location (in parted units: s, GB, %, etc. ; default: {}): "
 msgstr "أدخل نقطة البداية (بوحدات مجزأة: s، GB، %، إلخ؛ default: {}): "
@@ -118,7 +121,7 @@ msgid ""
 msgstr ""
 "{}\n"
 "\n"
-"حدد حسب الفهرس الأقسام المراد حذفها"
+"حدّد حسب الفهرس الأقسام المراد حذفها"
 
 msgid ""
 "{}\n"
@@ -127,13 +130,13 @@ msgid ""
 msgstr ""
 "{}\n"
 "\n"
-"اختر حسب الفهرس القسم الذي تريد تحميله حيث"
+"اختر حسب الفهرس التّقسيم الذي تريد تثبيته حيث"
 
 msgid " * Partition mount-points are relative to inside the installation, the boot would be /boot as an example."
-msgstr " * نقاط تحميل القسم هي نسبية داخل التثبيت، سيكون الإقلاع /boot كمثال. "
+msgstr " * نقاط تثبيت التّقسيم هي نسبية داخل التثبيت، سيكون الإقلاع /boot كمثال. "
 
 msgid "Select where to mount partition (leave blank to remove mountpoint): "
-msgstr "حدد مكان تحميل القسم (اتركه فارغاً لإزالة نقطة التحميل): "
+msgstr "حدّد مكان تثبيت التّقسيم (اتركه فارغاً لإزالة نقطة التثبيت): "
 
 msgid ""
 "{}\n"
@@ -142,7 +145,7 @@ msgid ""
 msgstr ""
 "{}\n"
 "\n"
-"حدد القسم المراد إخفاءه للتهيئة"
+"حدّد التّقسيم المراد إخفاءه للتهيئة"
 
 msgid ""
 "{}\n"
@@ -151,7 +154,7 @@ msgid ""
 msgstr ""
 "{}\n"
 "\n"
-"حدد القسم المراد وضع علامة على أنه مشفر"
+"حدّد التّقسيم المراد وضع علامة على أنه مشفّر"
 
 msgid ""
 "{}\n"
@@ -160,7 +163,7 @@ msgid ""
 msgstr ""
 "{}\n"
 "\n"
-"حدد القسم المراد وضع علامة على أنه قابل للإقلاع"
+"حدّد التّقسيم المراد وضع علامة على أنه قابل للإقلاع"
 
 msgid ""
 "{}\n"
@@ -169,25 +172,25 @@ msgid ""
 msgstr ""
 "{}\n"
 "\n"
-"حدد القسم المراد وضع علامة على أنه قابل للتمهيد"
+"حدّد التّقسيم المراد وضع علامة على أنه قابل للتّمهيد"
 
 msgid "Enter a desired filesystem type for the partition: "
-msgstr "أدخل نوع نظام الملفات المطلوب للقسم: "
+msgstr "أدخل نوع نظام الملفّات المطلوب للتّقسيم: "
 
 msgid "Archinstall language"
-msgstr "لغات Archinstall"
+msgstr "لغة Archinstall"
 
 msgid "Wipe all selected drives and use a best-effort default partition layout"
-msgstr "امسح جميع محركات الأقراص المحددة واستخدم تخطيط القسم الافتراضي الأفضل من حيث الجهد"
+msgstr "امسح جميع محرّكات الأقراص المحدّدة واستخدم أفضل جهد ممكن لتخطيط التّقسيم الأصلي"
 
 msgid "Select what to do with each individual drive (followed by partition usage)"
-msgstr "حدد ما يجب فعله بكل محرك أقراص على حدة (متبوعًا باستخدام القسم)"
+msgstr "حدّد ما يجب فعله بكلّ محرّك أقراص على حدة (متبوعًا باستخدام التّقسيم)"
 
 msgid "Select what you wish to do with the selected block devices"
-msgstr "حدد ما ترغب في القيام به مع أجهزة الكتلة المحددة"
+msgstr "حدّد ما ترغب في القيام به مع أجهزة الكتلة المحدّدة"
 
 msgid "This is a list of pre-programmed profiles, they might make it easier to install things like desktop environments"
-msgstr "هذه قائمة بالملفات الشخصية المبرمجة مسبقاً، قد تسهل تثبيت أشياء مثل بيئات سطح المكتب"
+msgstr "هذه قائمة بالملفّات الشخصية المبرمجة مسبقاً، قد تسهل تثبيت أشياء مثل بيئات سطح المكتب"
 
 msgid "Select keyboard layout"
 msgstr "تحديد تخطيط لوحة المفاتيح"
@@ -196,7 +199,7 @@ msgid "Select one of the regions to download packages from"
 msgstr "اختر إحدى المناطق لتنزيل الحزم منها"
 
 msgid "Select one or more hard drives to use and configure"
-msgstr "حدد محرك أقراص ثابت واحد أو أكثر لاستخدامه وإعداده"
+msgstr "حدّد محرّك أقراص ثابت واحد أو أكثر لاستخدامه وإعداده"
 
 msgid "For the best compatibility with your AMD hardware, you may want to use either the all open-source or AMD / ATI options."
 msgstr "للحصول على أفضل توافق مع أجهزة AMD الخاصة بك، قد ترغب في استخدام إما خيارات جميع المصادر المفتوحة المصدر أو AMD / ATI."
@@ -214,34 +217,34 @@ msgid ""
 msgstr ""
 "\n"
 "\n"
-"حدد برنامج تشغيل رسومات أو اتركه فارغاً لتثبيت جميع برامج التشغيل مفتوحة المصدر"
+"حدّد برنامج تشغيل رسومات أو اتركه فارغاً لتثبيت جميع برامج التشغيل مفتوحة المصدر"
 
 msgid "All open-source (default)"
-msgstr "جميعها مفتوحة المصدر (افتراضي)"
+msgstr "جميعها مفتوحة المصدر (أصلي)"
 
 msgid "Choose which kernels to use or leave blank for default \"{}\""
-msgstr "اختر النواة التي تريد استخدامها أو اتركها فارغة للإعداد الافتراضي \"{}\""
+msgstr "اختر النواة التي تريد استخدامها أو اتركها فارغة للإعداد الأصلي \"{}\""
 
 msgid "Choose which locale language to use"
-msgstr "اختر اللغة المحلية التي تريد استخدامها"
+msgstr "اختر اللّغة المحلية التي تريد استخدامها"
 
 msgid "Choose which locale encoding to use"
-msgstr "اختر ترميز الإعدادات المحلية المراد استخدامها"
+msgstr "اختر ترميز اللّغة الذي تريد استخدامه"
 
 msgid "Select one of the values shown below: "
 msgstr "اختر إحدى القيم الموضحة أدناه: "
 
 msgid "Select one or more of the options below: "
-msgstr "حدد واحداً أو أكثر من الخيارات أدناه: "
+msgstr "حدّد واحداً أو أكثر من الخيارات أدناه: "
 
 msgid "Adding partition...."
-msgstr "إضافة قسم...."
+msgstr "إضافة تقسيم...."
 
 msgid "You need to enter a valid fs-type in order to continue. See `man parted` for valid fs-type's."
 msgstr "تحتاج إلى إدخال نوع fs صالح من أجل المتابعة. انظر 'man parted' لمعرفة نوع fs صالح."
 
 msgid "Error: Listing profiles on URL \"{}\" resulted in:"
-msgstr "خطأ: نتج عن إدراج ملفات التعريف على عنوان URL \"{}\":"
+msgstr "خطأ: نتج عن إدراج ملفّات التعريف على عنوان URL \"{}\":"
 
 msgid "Error: Could not decode \"{}\" result as JSON:"
 msgstr "خطأ: تعذر فك تشفير نتيجة \"{}\" كنتيجة JSON:"
@@ -259,13 +262,13 @@ msgid "Locale encoding"
 msgstr "ترميز الإعدادات المحلية"
 
 msgid "Drive(s)"
-msgstr "محرك (أو محركات)"
+msgstr "محرّك (أو محرّكات)"
 
 msgid "Disk layout"
 msgstr "تخطيط القرص"
 
 msgid "Encryption password"
-msgstr "كلمة سر التشفير"
+msgstr "كلمة سر التّشفير"
 
 msgid "Swap"
 msgstr "ذاكرة التبديل(Swap)"
@@ -295,7 +298,7 @@ msgid "Additional packages"
 msgstr "الباقات الإضافية"
 
 msgid "Network configuration"
-msgstr "ضبط الشبكة"
+msgstr "ضبط الشّبكة"
 
 msgid "Automatic time sync (NTP)"
 msgstr "المزامنة التلقائية للوقت (NTP)"
@@ -310,12 +313,12 @@ msgid ""
 "Do you wish to continue?"
 msgstr ""
 "قررت تخطي اختيار القرص الصلب\n"
-"وستستخدم أي إعداد لمحرك الأقراص مثبت على {} (تجريبي)\n"
+"وستستخدم أيّ إعداد لمحرّك الأقراص مثبت على {} (تجريبي)\n"
 "تحذير: لن يتحقق برنامج Archinstall من ملاءمة هذا الإعداد\n"
 "هل ترغب في المتابعة؟"
 
 msgid "Re-using partition instance: {}"
-msgstr "إعادة استخدام مثيل القسم: {}"
+msgstr "إعادة استخدام مثيل التّقسيم: {}"
 
 msgid "Create a new partition"
 msgstr "أنشئ قسماً جديداً"
@@ -330,16 +333,16 @@ msgid "Assign mount-point for a partition"
 msgstr "تعيين نقطة تثبيت لقسم"
 
 msgid "Mark/Unmark a partition to be formatted (wipes data)"
-msgstr "وضع علامة/إلغاء وضع علامة على قسم ليتم تهيئته (مسح البيانات)"
+msgstr "وضع علامة/إلغاء وضع علامة على تقسيم ليتم تهيئته (مسح البيانات)"
 
 msgid "Mark/Unmark a partition as encrypted"
-msgstr "وضع علامة/إلغاء وضع علامة على قسم على أنه مشفر"
+msgstr "وضع علامة/إلغاء وضع علامة على تقسيم على أنه مشفّر"
 
 msgid "Mark/Unmark a partition as bootable (automatic for /boot)"
-msgstr "تحديد/إلغاء تحديد قسم على أنه قابل للإقلاع (تلقائي ل /boot)"
+msgstr "تحديد/إلغاء تحديد تقسيم على أنه قابل للإقلاع (تلقائي ل /boot)"
 
 msgid "Set desired filesystem for a partition"
-msgstr "تعيين نظام الملفات المطلوب للقسم"
+msgstr "تعيين نظام الملفّات المطلوب للتّقسيم"
 
 msgid "Abort"
 msgstr "إلغاء"
@@ -357,7 +360,7 @@ msgid "Set/Modify the below options"
 msgstr "تعيين/تعديل الخيارات التالية"
 
 msgid "Install"
-msgstr "التثبيت"
+msgstr "التّثبيت"
 
 msgid ""
 "Use ESC to skip\n"
@@ -365,7 +368,7 @@ msgid ""
 msgstr "استخدم ESC لتخطي\n"
 
 msgid "Suggest partition layout"
-msgstr "اقتراح تخطيط التقسيم"
+msgstr "اقتراح تخطيط التّقسيم"
 
 msgid "Enter a password: "
 msgstr "أدخل كلمة مرور: "
@@ -377,7 +380,7 @@ msgid "Enter disk encryption password (leave blank for no encryption): "
 msgstr "أدخل كلمة مرور تشفير القرص (اتركها فارغة لعدم وجود تشفير): "
 
 msgid "Create a required super-user with sudo privileges: "
-msgstr "أدخل كلمة مرور تشفير القرص (اتركها فارغة لعدم استخدام التشفير): "
+msgstr "أدخل كلمة مرور تشفير القرص (اتركها فارغة لعدم استخدام التّشفير): "
 
 msgid "Enter root password (leave blank to disable root): "
 msgstr "أدخل كلمة مرور الجذر (اتركها فارغة لتعطيل الجذر): "
@@ -389,7 +392,7 @@ msgid "Verifying that additional packages exist (this might take a few seconds)"
 msgstr "التحقق من وجود حزم إضافية (قد يستغرق ذلك بضع ثوانٍ)"
 
 msgid "Would you like to use automatic time synchronization (NTP) with the default time servers?\n"
-msgstr "هل ترغب في استخدام المزامنة التلقائية للوقت (NTP) مع خوادم الوقت الافتراضية؟\n"
+msgstr "هل ترغب في استخدام المزامنة التلقائية للوقت (NTP) مع خوادم الوقت الأصلية؟\n"
 
 msgid ""
 "Hardware time and other post-configuration steps might be required in order for NTP to work.\n"
@@ -409,7 +412,7 @@ msgid ""
 " Choose an object from the list, and select one of the available actions for it to execute"
 msgstr ""
 "\n"
-" اختر غرضًا من القائمة، وحدد أحد الإجراءات المتاحة لتنفيذه"
+" اختر غرضًا من القائمة، وحدّد أحد الإجراءات المتاحة لتنفيذه"
 
 msgid "Cancel"
 msgstr "إلغاء"
@@ -486,7 +489,7 @@ msgid "No network configuration"
 msgstr "لا يوجد إعداد للشبكة"
 
 msgid "Set desired subvolumes on a btrfs partition"
-msgstr "تعيين وحدات التخزين الفرعية المطلوبة على قسم btrfs"
+msgstr "تعيين وحدات التخزين الفرعيّة المطلوبة على تقسيم btrfs"
 
 msgid ""
 "{}\n"
@@ -495,10 +498,10 @@ msgid ""
 msgstr ""
 "{}\n"
 "\n"
-"حدد القسم الذي تريد تعيين وحدات التخزين الفرعية عليه"
+"حدّد التّقسيم الذي تريد تعيين وحدات التخزين الفرعيّة عليه"
 
 msgid "Manage btrfs subvolumes for current partition"
-msgstr "إدارة وحدات تخزين btrfs الفرعية للقسم الحالي"
+msgstr "إدارة وحدات تخزين btrfs الفرعيّة للتّقسيم الحالي"
 
 msgid "No configuration"
 msgstr "لا يوجد إعدادات"
@@ -562,53 +565,53 @@ msgid ""
 " Fill the desired values for a new subvolume \n"
 msgstr ""
 "\n"
-" املأ القيم المطلوبة لوحدة التخزين الفرعية الجديدة \n"
+" املأ القيم المطلوبة لوحدة التّخزين الفرعيّة الجديدة \n"
 
 msgid "Subvolume name "
-msgstr "اسم وحدة التخزين الفرعية "
+msgstr "اسم وحدة التّخزين الفرعيّة "
 
 msgid "Subvolume mountpoint"
-msgstr "نقطة تحميل وحدة التخزين الفرعية"
+msgstr "نقطة تثبيت وحدة التّخزين الفرعيّة"
 
 msgid "Subvolume options"
-msgstr "خيارات وحدة التخزين الفرعية"
+msgstr "خيارات وحدة التّخزين الفرعيّة"
 
 msgid "Save"
 msgstr "حفظ"
 
 msgid "Subvolume name :"
-msgstr "اسم وحدة التخزين الفرعية :"
+msgstr "اسم وحدة التّخزين الفرعيّة :"
 
 msgid "Select a mount point :"
-msgstr "حدد نقطة التثبيت :"
+msgstr "حدّد نقطة التّثبيت :"
 
 msgid "Select the desired subvolume options "
-msgstr "حدد خيارات وحدة التخزين الفرعية المطلوبة "
+msgstr "حدّد خيارات وحدة التّخزين الفرعيّة المطلوبة "
 
 msgid "Define users with sudo privilege, by username: "
 msgstr "تحديد المستخدمين الذين لديهم امتياز sudo، حسب اسم المستخدم: "
 
 #, python-brace-format
 msgid "[!] A log file has been created here: {}"
-msgstr "[!] تم إنشاء ملف سجل هنا: {}"
+msgstr "[!] تم إنشاء ملفّ سجل هنا: {}"
 
 msgid "Would you like to use BTRFS subvolumes with a default structure?"
-msgstr "هل ترغب في استخدام وحدات التخزين الفرعية BTRFS ذات البنية الافتراضية؟"
+msgstr "هل ترغب في استخدام وحدات التخزين الفرعيّة BTRFS ذات البنية الأصلية؟"
 
 msgid "Would you like to use BTRFS compression?"
 msgstr "هل ترغب في استخدام ضغط BTRFS؟"
 
 msgid "Would you like to create a separate partition for /home?"
-msgstr "هل ترغب في إنشاء قسم منفصل لـ /home؟"
+msgstr "هل ترغب في إنشاء تقسيم منفصل لـ /home؟"
 
 msgid "The selected drives do not have the minimum capacity required for an automatic suggestion\n"
-msgstr "لا تحتوي محركات الأقراص المحددة على الحد الأدنى من السعة المطلوبة للاقتراح التلقائي\n"
+msgstr "لا تحتوي محرّكات الأقراص المحدّدة على الحد الأدنى من السعة المطلوبة للاقتراح التلقائي\n"
 
 msgid "Minimum capacity for /home partition: {}GB\n"
-msgstr "الحد الأدنى لسعة القسم /home: {} جيجابايت\n"
+msgstr "الحد الأدنى لسعة التّقسيم /home: {} جيجابايت\n"
 
 msgid "Minimum capacity for Arch Linux partition: {}GB"
-msgstr "الحد الأدنى لسعة قسم Arch Linux: {} جيجابايت"
+msgstr "الحد الأدنى لسعة تقسيم Arch Linux: {} جيجابايت"
 
 msgid "Continue"
 msgstr "متابعة"
@@ -620,34 +623,34 @@ msgid "no"
 msgstr "لا"
 
 msgid "set: {}"
-msgstr "حدد: {}"
+msgstr "حدّد: {}"
 
 msgid "Manual configuration setting must be a list"
 msgstr "يجب أن يكون إعداد التكوين اليدوي قائمة"
 
 msgid "No iface specified for manual configuration"
-msgstr "لا يوجد وجه (iface) محدد للتكوين اليدوي"
+msgstr "لا يوجد وجه (iface) محدّد للتكوين اليدوي"
 
 msgid "Manual nic configuration with no auto DHCP requires an IP address"
 msgstr "يتطلب تكوين nic اليدوي مع عدم وجود DHCP التلقائي عنوان IP"
 
 msgid "Add interface"
-msgstr "إضافة واجهة"
+msgstr "إضافة ربط"
 
 msgid "Edit interface"
-msgstr "تعديل الواجهة"
+msgstr "تعديل الرّبط"
 
 msgid "Delete interface"
-msgstr "حذف الواجهة"
+msgstr "حذف الرّبط"
 
 msgid "Select interface to add"
-msgstr "حدد واجهة لإضافتها"
+msgstr "حدّد ربطًا لإضافته"
 
 msgid "Manual configuration"
 msgstr "ضبط يدوي"
 
 msgid "Mark/Unmark a partition as compressed (btrfs only)"
-msgstr "وضع علامة/إلغاء وضع علامة على قسم كقسم مضغوط (btrfs فقط)"
+msgstr "وضع علامة/إلغاء وضع علامة على تقسيم كقسم مضغوط (btrfs فقط)"
 
 msgid "The password you are using seems to be weak, are you sure you want to use it?"
 msgstr "يبدو أن كلمة المرور التي تستخدمها ضعيفة، هل أنت متأكد من أنك تريد استخدامها؟"
@@ -656,7 +659,7 @@ msgid "Provides a selection of desktop environments and tiling window managers, 
 msgstr "يوفر مجموعة مختارة من بيئات سطح المكتب ومديري نوافذ التجانب، مثل gnome و kde و sway"
 
 msgid "Select your desired desktop environment"
-msgstr "حدد بيئة سطح المكتب التي تريدها"
+msgstr "حدّد بيئة سطح المكتب التي تريدها"
 
 msgid "A very basic installation that allows you to customize Arch Linux as you see fit."
 msgstr "تثبيت أساسي جداً يسمح لك بتخصيص آرتش لينكس (Arch Linux) كما تراه مناسباً."
@@ -665,7 +668,7 @@ msgid "Provides a selection of various server packages to install and enable, e.
 msgstr "يوفر مجموعة مختارة من حزم الخوادم المختلفة لتثبيتها وتمكينها، مثل httpd و nginx و mariadb"
 
 msgid "Choose which servers to install, if none then a minimal installation will be done"
-msgstr "اختر الخوادم التي سيتم تثبيتها، إذا لم يكن هناك أي خوادم، فسيتم إجراء الحد الأدنى من التثبيت"
+msgstr "اختر الخوادم التي سيتم تثبيتها، إذا لم يكن هناك أيّ خوادم، فسيتم إجراء الحد الأدنى من التّثبيت"
 
 msgid "Installs a minimal system as well as xorg and graphics drivers."
 msgstr "تثبيت الحد الأدنى من النظام بالإضافة إلى إكسورج (xorg) وبرامج تشغيل الرسومات."
@@ -674,16 +677,16 @@ msgid "Press Enter to continue."
 msgstr "اضغط على Enter للمتابعة."
 
 msgid "Would you like to chroot into the newly created installation and perform post-installation configuration?"
-msgstr "هل ترغب في الانتقال (chroot) إلى التثبيت الذي تم إنشاؤه حديثاً وإجراء تهيئة ما بعد التثبيت؟"
+msgstr "هل ترغب في الانتقال (chroot) إلى التّثبيت الذي تم إنشاؤه حديثاً وإجراء تهيئة ما بعد التثبيت؟"
 
 msgid "Are you sure you want to reset this setting?"
 msgstr "هل أنت متأكد من رغبتك في إعادة ضبط هذا الإعداد؟"
 
 msgid "Select one or more hard drives to use and configure\n"
-msgstr "حدد محرك أقراص صلب واحد أو أكثر لاستخدامه وضبطه\n"
+msgstr "حدّد محرّك أقراص صلب واحد أو أكثر لاستخدامه وضبطه\n"
 
 msgid "Any modifications to the existing setting will reset the disk layout!"
-msgstr "أي تعديلات على الإعداد الحالي سيعيد ضبط تخطيط القرص!"
+msgstr "أيّ تعديلات على الإعداد الحالي سيعيد ضبط تخطيط القرص!"
 
 msgid "If you reset the harddrive selection this will also reset the current disk layout. Are you sure?"
 msgstr "إذا قمت بإعادة تعيين اختيار القرص الصلب، فسيؤدي ذلك أيضًا إلى إعادة تعيين تخطيط القرص الحالي. هل أنت متأكد؟"
@@ -702,7 +705,7 @@ msgid "No audio server"
 msgstr "لا يوجد خادم صوت"
 
 msgid "(default)"
-msgstr "(افتراضي)"
+msgstr "(أصلي)"
 
 msgid "Use ESC to skip"
 msgstr "استخدم زر الهروب ESC للتخطي"
@@ -734,16 +737,16 @@ msgid "Value: "
 msgstr "القيمة: "
 
 msgid "You can skip selecting a drive and partitioning and use whatever drive-setup is mounted at /mnt (experimental)"
-msgstr "يمكنك تخطي تحديد محرك أقراص وتقسيمه واستخدام أي إعدادات محرك أقراص مثبتة على /mnt (تجريبي)"
+msgstr "يمكنك تخطي تحديد محرّك أقراص وتقسيمه واستخدام أيّ إعدادات محرّك أقراص مثبتة على /mnt (تجريبي)"
 
 msgid "Select one of the disks or skip and use /mnt as default"
-msgstr "حدد أحد الأقراص أو تخطى واستخدم  /mnt كافتراضي"
+msgstr "حدّد أحد الأقراص أو تخطى واستخدم  /mnt كأصلي"
 
 msgid "Select which partitions to mark for formatting:"
-msgstr "حدد الأقسام التي تريد وضع علامة عليها للتهيئة:"
+msgstr "حدّد الأقسام التي تريد وضع علامة عليها للتهيئة:"
 
 msgid "Use HSM to unlock encrypted drive"
-msgstr "استخدام HSM لإلغاء قفل محرك الأقراص المشفر"
+msgstr "استخدام HSM لإلغاء قفل محرّك الأقراص المشفر"
 
 msgid "Device"
 msgstr "جهاز"
@@ -770,7 +773,7 @@ msgid "Should \"{}\" be a superuser (sudo)?"
 msgstr "هل يجب أن يكون \"{}\" مستخدمًا خارقًا (sudo)؟"
 
 msgid "Select which partitions to encrypt"
-msgstr "حدد الأقسام المراد تشفيرها"
+msgstr "حدّد الأقسام المراد تشفيرها"
 
 msgid "very weak"
 msgstr "ضعيف جداً"
@@ -794,10 +797,10 @@ msgid "Delete subvolume"
 msgstr "حذف الحجم الفرعي"
 
 msgid "Configured {} interfaces"
-msgstr "تهيئة {} الواجهات"
+msgstr "هُيِّئَت {} روابط"
 
 msgid "This option enables the number of parallel downloads that can occur during installation"
-msgstr "يتيح هذا الخيار عدد التنزيلات المتوازية التي يمكن أن تحدث أثناء التثبيت"
+msgstr "يتيح هذا الخيار عدد التنزيلات المتوازية التي يمكن أن تحدث أثناء التّثبيت"
 
 msgid ""
 "Enter the number of parallel downloads to be enabled.\n"
@@ -815,7 +818,7 @@ msgid " - Minimum value   : 1 ( Allows 1 parallel download, allows 2 downloads a
 msgstr " - الحد الأدنى للقيمة: 1 (يسمح بتنزيل متوازي واحد، ويسمح بتنزيلين في المرة الواحدة)"
 
 msgid " - Disable/Default : 0 ( Disables parallel downloading, allows only 1 download at a time )"
-msgstr " - تعطيل/افتراضي: 0 (تعطيل التنزيل المتوازي، يسمح بتنزيل واحد فقط في كل مرة)"
+msgstr " - تعطيل/أصلي: 0 (تعطيل التنزيل المتوازي، يسمح بتنزيل واحد فقط في كل مرة)"
 
 #, python-brace-format
 msgid "Invalid input! Try again with a valid input [1 to {max_downloads}, or 0 to disable]"
@@ -823,6 +826,22 @@ msgstr "إدخال غير صالح! حاول مرة أخرى بإدخال صال
 
 msgid "Parallel Downloads"
 msgstr "التنزيلات الموازية"
+
+msgid "Pacman"
+msgstr ""
+
+msgid "Color"
+msgstr ""
+
+#, fuzzy, python-brace-format
+msgid "Enter the number of parallel downloads (1-{})"
+msgstr ""
+"أدخل عدد التنزيلات المتوازية المراد تمكينها.\n"
+"\n"
+"ملاحظة:\n"
+
+msgid "Enable colored output for pacman"
+msgstr ""
 
 msgid "ESC to skip"
 msgstr "زر الهروب ESC للتخطي"
@@ -834,11 +853,11 @@ msgid "TAB to select"
 msgstr "TAB لتحديد"
 
 msgid "[Default value: 0] > "
-msgstr "[القيمة الافتراضية: 0] > "
+msgstr "[القيمة الأصلية: 0] > "
 
 msgid "To be able to use this translation, please install a font manually that supports the language."
 msgstr ""
-"لتتمكن من استخدام هذه الترجمة، يرجى تثبيت الخط يدوياً الذي يدعم اللغة.\n"
+"لتتمكن من استخدام هذه الترجمة، يرجى تثبيت الخط يدوياً الذي يدعم اللّغة.\n"
 "To be able to use this translation, please install a font manually that supports the language."
 
 msgid "The font should be stored as {}"
@@ -852,14 +871,14 @@ msgstr "تحديد وضع التنفيذ"
 
 #, python-brace-format
 msgid "Unable to fetch profile from specified url: {}"
-msgstr "تعذر جلب ملف التعريف من عنوان url المحدد: {}"
+msgstr "تعذر جلب ملفّ التعريف من عنوان url المحدّد: {}"
 
 #, python-brace-format
 msgid "Profiles must have unique name, but profile definitions with duplicate name found: {}"
-msgstr "يجب أن يكون لملفات التعريف (profile) اسم فريد، ولكن تم العثور على تعريفات ملفات التعريف (profile) ذات أسماء مكررة: {}"
+msgstr "يجب أن يكون لملفّات التعريف (profile) اسم فريد، ولكن تم العثور على تعريفات ملفّات التعريف (profile) ذات أسماء مكررة: {}"
 
 msgid "Select one or more devices to use and configure"
-msgstr "حدد جهازاً واحداً أو أكثر لاستخدامه وإعداده"
+msgstr "حدّد جهازاً واحداً أو أكثر لاستخدامه وإعداده"
 
 msgid "If you reset the device selection this will also reset the current disk layout. Are you sure?"
 msgstr "إذا قمت بإعادة تعيين تحديد الجهاز فسيؤدي ذلك أيضاً إلى إعادة تعيين تخطيط القرص الحالي. هل أنت متأكد؟"
@@ -868,21 +887,21 @@ msgid "Existing Partitions"
 msgstr "الأقسام الموجودة"
 
 msgid "Select a partitioning option"
-msgstr "حدد خيار التقسيم"
+msgstr "حدّد خيار التّقسيم"
 
 msgid "Enter the root directory of the mounted devices: "
 msgstr "أدخل دليل الجذر للأجهزة المثبتة:  "
 
 #, python-brace-format
 msgid "Minimum capacity for /home partition: {}GiB\n"
-msgstr "الحد الأدنى لسعة القسم /home: {} جيجا بايت GiB \n"
+msgstr "الحد الأدنى لسعة التّقسيم /home: {} جيجا بايت GiB \n"
 
 #, python-brace-format
 msgid "Minimum capacity for Arch Linux partition: {}GiB"
-msgstr "الحد الأدنى لسعة قسم آرش لينكس (Arch Linux): {} جيجا بايت (GiB)"
+msgstr "الحد الأدنى لسعة تقسيم آرش لينكس (Arch Linux): {} جيجا بايت (GiB)"
 
 msgid "This is a list of pre-programmed profiles_bck, they might make it easier to install things like desktop environments"
-msgstr "هذه قائمة بالملفات الشخصية المبرمجة مسبقاً_bck، قد تسهل تثبيت أشياء مثل بيئات سطح المكتب"
+msgstr "هذه قائمة بالملفّات الشخصية المبرمجة مسبقاً_bck، قد تسهل تثبيت أشياء مثل بيئات سطح المكتب"
 
 msgid "Current profile selection"
 msgstr "اختيار الملف الشخصي الحالي"
@@ -891,7 +910,7 @@ msgid "Remove all newly added partitions"
 msgstr "إزالة جميع الأقسام المضافة حديثاً"
 
 msgid "Assign mountpoint"
-msgstr "تعيين نقطة التحميل"
+msgstr "تعيين نقطة التثبيت"
 
 msgid "Mark/Unmark to be formatted (wipes data)"
 msgstr "وضع او إلغاء علامة تحديد التهيئة (مسح البيانات)"
@@ -900,31 +919,31 @@ msgid "Mark/Unmark as bootable"
 msgstr "وضع او إلغاء علامة قابل للإقلاع"
 
 msgid "Change filesystem"
-msgstr "تغيير نظام الملفات"
+msgstr "تغيير نظام الملفّات"
 
 msgid "Mark/Unmark as compressed"
 msgstr "وضع او إلغاء علامة كمضغوط"
 
 msgid "Set subvolumes"
-msgstr "تعيين المجلدات الفرعية"
+msgstr "تعيين المجلدات الفرعيّة"
 
 msgid "Delete partition"
-msgstr "حذف القسم"
+msgstr "حذف التّقسيم"
 
 msgid "Partition"
 msgstr "تقسيم"
 
 msgid "This partition is currently encrypted, to format it a filesystem has to be specified"
-msgstr "هذا القسم مشفر حالياً، ولتهيئة نظام الملفات يجب تحديد نظام الملفات"
+msgstr "هذا التّقسيم مشفّر حالياً، ولتهيئة نظام الملفّات يجب تحديد نظام الملفّات"
 
 msgid "Partition mount-points are relative to inside the installation, the boot would be /boot as an example."
-msgstr "نقاط تحميل القسم تكون نسبية داخل التثبيت، سيكون الإقلاع /boot كمثال."
+msgstr "نقاط تثبيت التّقسيم تكون نسبية داخل التثبيت، سيكون الإقلاع /boot كمثال."
 
 msgid "If mountpoint /boot is set, then the partition will also be marked as bootable."
-msgstr "إذا تم تعيين نقطة التثبيت /boot، فسيتم وضع علامة على القسم أيضًا على أنه قابل للإقلاع."
+msgstr "إذا تم تعيين نقطة التّثبيت /boot، فسيتم وضع علامة على التّقسيم أيضًا على أنه قابل للإقلاع."
 
 msgid "Mountpoint: "
-msgstr " نقطة التثبيت: "
+msgstr "نقطة التّثبيت: "
 
 msgid "Current free sectors on device {}:"
 msgstr "القطاعات الخالية الحالية على الجهاز {}:"
@@ -933,51 +952,51 @@ msgid "Total sectors: {}"
 msgstr "إجمالي القطاعات: {}"
 
 msgid "Enter the start sector (default: {}): "
-msgstr "أدخل قطاع البداية (افتراضي: {}): "
+msgstr "أدخل قطاع البداية (أصلي: {}): "
 
 msgid "Enter the end sector of the partition (percentage or block number, default: {}): "
-msgstr "أدخل قطاع نهاية القسم (النسبة المئوية أو رقم الكتلة، الافتراضي: {}): "
+msgstr "أدخل قطاع نهاية التّقسيم (النسبة المئوية أو رقم الكتلة، الأصلي: {}): "
 
 msgid "This will remove all newly added partitions, continue?"
 msgstr "سيؤدي ذلك إلى إزالة جميع الأقسام المضافة حديثاً، متابعة؟"
 
 #, python-brace-format
 msgid "Partition management: {}"
-msgstr "إدارة التقسيم: {}"
+msgstr "إدارة التّقسيم: {}"
 
 #, python-brace-format
 msgid "Total length: {}"
 msgstr "الطول الإجمالي: {}"
 
 msgid "Encryption type"
-msgstr "نوع التشفير"
+msgstr "نوع التّشفير"
 
 msgid "Iteration time"
-msgstr ""
+msgstr "مُدّة التّكرار"
 
 msgid "Enter iteration time for LUKS encryption (in milliseconds)"
-msgstr ""
+msgstr "أدخل مدّة التّكرار لتشفير LUKS (بالملّي ثانية)"
 
 msgid "Higher values increase security but slow down boot time"
-msgstr ""
+msgstr "تزيد القِيَمُ الأعلى من مستوى الأمان ولكنّها تبطئ وقت بدء التّشغيل"
 
 msgid "Default: 10000ms, Recommended range: 1000-60000"
-msgstr ""
+msgstr "الأصلي: 10000 ملّي ثانية، النّطاق المُستَحسَن: من 1000 إلى 60000"
 
 msgid "Iteration time cannot be empty"
-msgstr ""
+msgstr "مُدّة التّكرار لا تكون فارغة"
 
 msgid "Iteration time must be at least 100ms"
-msgstr ""
+msgstr "مُدّة التّكرار ينبغي ألّا تقلّ عن 100 ملّي ثانية"
 
 msgid "Iteration time must be at most 120000ms"
-msgstr ""
+msgstr "مُدّة التّكرار ينبغي ألّا تتجاوز 120000 ملّي ثانية"
 
 msgid "Please enter a valid number"
-msgstr ""
+msgstr "الرّجاء إدخال رقم صحيح"
 
 msgid "Partitions"
-msgstr "التقسيمات"
+msgstr "التّقسيمات"
 
 msgid "No HSM devices available"
 msgstr "لا توجد أجهزة HSM متوفرة"
@@ -986,25 +1005,25 @@ msgid "Partitions to be encrypted"
 msgstr "الأقسام المراد تشفيرها"
 
 msgid "Select disk encryption option"
-msgstr "حدد خيار تشفير القرص"
+msgstr "حدّد خيار تشفير القرص"
 
 msgid "Select a FIDO2 device to use for HSM"
 msgstr "اختر جهاز FIDO2 لاستخدامه في HSM"
 
 msgid "Use a best-effort default partition layout"
-msgstr "استخدم أفضل تخطيط افتراضي للتقسيم الافتراضي"
+msgstr "استخدم أفضل جهد ممكن لتخطيط التّقسيم الإصلي"
 
 msgid "Manual Partitioning"
-msgstr "التقسيم اليدوي"
+msgstr "التّقسيم اليدوي"
 
 msgid "Pre-mounted configuration"
 msgstr "تهيئة مثبتة مسبقاً"
 
 msgid "Unknown"
-msgstr "غير معروف"
+msgstr "مجهول"
 
 msgid "Partition encryption"
-msgstr "تشفير التقسيم"
+msgstr "تشفير التّقسيم"
 
 #, python-brace-format
 msgid " ! Formatting {} in "
@@ -1023,13 +1042,13 @@ msgid "Password"
 msgstr "كلمة المرور"
 
 msgid "All settings will be reset, are you sure?"
-msgstr "ستتم إعادة ضبط جميع الإعدادات، هل أنت متأكد؟"
+msgstr "ستتم إعادة ضبط جميع الإعدادات، هل أنت متأكّد؟"
 
 msgid "Back"
 msgstr "رجوع"
 
 msgid "Please chose which greeter to install for the chosen profiles: {}"
-msgstr "يرجى اختيار المُرحِّب الذي سيتم تثبيته للملفات الشخصية المختارة: {}"
+msgstr "يرجى اختيار المُرحِّب الذي سيتم تثبيته للملفّات الشّخصية المختارة: {}"
 
 #, python-brace-format
 msgid "Environment type: {}"
@@ -1042,7 +1061,7 @@ msgid "Installed packages"
 msgstr "الحزم المثبّتة"
 
 msgid "Add profile"
-msgstr "إضافة ملف شخصي"
+msgstr "إضافة ملفّ شخصي"
 
 msgid "Edit profile"
 msgstr "تعديل الملف الشخصي"
@@ -1060,10 +1079,10 @@ msgid "Packages to be install with this profile (space separated, leave blank to
 msgstr "اكتب حزمًا إضافية لتثبيتها (تُفصَل بالمسافات، اتركها فارغة للتخطي): "
 
 msgid "Services to be enabled with this profile (space separated, leave blank to skip): "
-msgstr "الخدمات التي سيتم تمكينها مع ملف التعريف هذا (مفصولة بمسافة، اتركها فارغة للتخطي):  "
+msgstr "الخدمات التي سيتم تمكينها مع ملفّ التعريف هذا (مفصولة بمسافة، اتركها فارغة للتخطي):  "
 
 msgid "Should this profile be enabled for installation?"
-msgstr "هل يجب تمكين ملف التعريف هذا للتثبيت؟"
+msgstr "هل يجب تمكين ملفّ التعريف هذا للتثبيت؟"
 
 msgid "Create your own"
 msgstr "اصنع بنفسك"
@@ -1073,7 +1092,7 @@ msgid ""
 "Select a graphics driver or leave blank to install all open-source drivers"
 msgstr ""
 "\n"
-"حدد برنامج تشغيل رسومات أو اتركه فارغاً لتثبيت جميع برامج التشغيل مفتوحة المصدر"
+"حدّد برنامج تشغيل رسومات أو اتركه فارغاً لتثبيت جميع برامج التشغيل مفتوحة المصدر"
 
 msgid "Sway needs access to your seat (collection of hardware devices i.e. keyboard, mouse, etc)"
 msgstr "يحتاج Sway إلى الوصول إلى مقعدك (مجموعة من الأجهزة مثل لوحة المفاتيح والماوس وغيرها)"
@@ -1085,7 +1104,7 @@ msgid ""
 msgstr ""
 "\n"
 "\n"
-"حدد خياراً لمنح Sway إمكانية الوصول إلى أجهزتك"
+"حدّد خياراً لمنح Sway إمكانية الوصول إلى أجهزتك"
 
 msgid "Graphics driver"
 msgstr "مشغل الرسومات"
@@ -1097,28 +1116,28 @@ msgid "Please chose which greeter to install"
 msgstr "يرجى اختيار المُرحِّب الذي سيتم تثبيته"
 
 msgid "This is a list of pre-programmed default_profiles"
-msgstr "هذه قائمة بالملفات الافتراضية المبرمجة مسبقًا"
+msgstr "هذه قائمة بالملفّات الأصلية المبرمجة مسبقًا"
 
 msgid "Disk configuration"
 msgstr "ضبط القرص"
 
 msgid "Profiles"
-msgstr "الملفات الشخصية"
+msgstr "الملفّات الشخصية"
 
 msgid "Finding possible directories to save configuration files ..."
-msgstr "البحث عن الدلائل المحتملة لحفظ ملفات الإعدادات ..."
+msgstr "البحث عن الدلائل المحتملة لحفظ ملفّات الإعدادات ..."
 
 msgid "Select directory (or directories) for saving configuration files"
-msgstr "تحديد مجلد (أو مجلدات) لحفظ ملفات التكوين"
+msgstr "تحديد مجلد (أو مجلدات) لحفظ ملفّات التكوين"
 
 msgid "Add a custom mirror"
-msgstr "إضافة مرآة مخصصة"
+msgstr "إضافة مرآة مخصّصة"
 
 msgid "Change custom mirror"
-msgstr "تغيير المرآة المخصصة"
+msgstr "تغيير المرآة المخصّصة"
 
 msgid "Delete custom mirror"
-msgstr "حذف المرآة المخصصة"
+msgstr "حذف المرآة المخصّصة"
 
 msgid "Enter name (leave blank to skip): "
 msgstr "أدخل الاسم (اترك الاسم فارغاً للتخطي):  "
@@ -1127,16 +1146,16 @@ msgid "Enter url (leave blank to skip): "
 msgstr "أدخل عنوان url (اتركه فارغاً للتخطي):  "
 
 msgid "Select signature check option"
-msgstr "حدد خيار التحقق من التوقيع"
+msgstr "حدّد خيار التحقق من التوقيع"
 
 msgid "Select signature option"
-msgstr "حدد خيار التوقيع"
+msgstr "حدّد خيار التوقيع"
 
 msgid "Custom mirrors"
-msgstr "مرايا مخصصة"
+msgstr "مرايا مخصّصة"
 
 msgid "Defined"
-msgstr "محدد"
+msgstr "محدّد"
 
 msgid "Save user configuration (including disk layout)"
 msgstr "حفظ إعدادات المستخدم (بما في ذلك تخطيط القرص)"
@@ -1153,12 +1172,12 @@ msgid ""
 "\n"
 "{}"
 msgstr ""
-"هل تريد حفظ ملف (ملفات) الضبط {} في الموقع التالي؟\n"
+"هل تريد حفظ ملفّ (ملفّات) الضبط {} في الموقع التالي؟\n"
 "\n"
 "{}"
 
 msgid "Saving {} configuration files to {}"
-msgstr "حفظ {} ملفات الإعدادات إلى {}"
+msgstr "حفظ {} ملفّات الإعدادات إلى {}"
 
 msgid "Mirrors"
 msgstr "المرايا"
@@ -1176,7 +1195,7 @@ msgid "Locales"
 msgstr "المحلية (Locales)"
 
 msgid "Use NetworkManager (necessary to configure internet graphically in GNOME and KDE)"
-msgstr "استخدم مُدير الشبكة NetworkManager (ضروري لإعداد الإنترنت باستخدام واجهة رسومية في جنوم و كيدي)"
+msgstr "استخدم NetworkManager (ضروري لإعداد الإنترنت باستخدام واجهة رسومية في جنوم و كيدي)"
 
 msgid "Total: {} / {}"
 msgstr "الإجمالي: {} / {}"
@@ -1188,10 +1207,10 @@ msgid "If no unit is provided, the value is interpreted as sectors"
 msgstr "إذا لم يتم توفير أي وحدة، يتم تفسير القيمة على أنها قطاعات"
 
 msgid "Enter start (default: sector {}): "
-msgstr "أدخل البداية (افتراضي: القطاع {}):  "
+msgstr "أدخل البداية (أصلي: القطاع {}):  "
 
 msgid "Enter end (default: {}): "
-msgstr "أدخل النهاية (افتراضي: {}): "
+msgstr "أدخل النهاية (أصلي: {}): "
 
 msgid "Unable to determine fido2 devices. Is libfido2 installed?"
 msgstr "غير قادر على تحديد أجهزة fido2. هل تم تثبيت libfido2؟"
@@ -1229,7 +1248,7 @@ msgid " - Maximum recommended value : {} ( Allows {} parallel downloads at a tim
 msgstr " - الحد الأقصى للقيمة الموصى بها: {} (يسمح بـ {} تنزيلات متوازية في المرة الواحدة)"
 
 msgid " - Disable/Default : 0 ( Disables parallel downloading, allows only 1 download at a time )\n"
-msgstr " - تعطيل/افتراضي: 0 (تعطيل التنزيل المتوازي، يسمح بتنزيل واحد فقط في كل مرة)\n"
+msgstr " - تعطيل/أصلي: 0 (تعطيل التنزيل المتوازي، يسمح بتنزيل واحد فقط في كل مرة)\n"
 
 msgid "Invalid input! Try again with a valid input [or 0 to disable]"
 msgstr "إدخال غير صالح! حاول مرة أخرى باستخدام إدخال صحيح [أو 0 لتعطيل]"
@@ -1244,7 +1263,7 @@ msgid ""
 msgstr ""
 "\n"
 "\n"
-"حدد خيارًا لمنح Hyprland إمكانية الوصول إلى أجهزتك"
+"حدّد خيارًا لمنح Hyprland إمكانية الوصول إلى أجهزتك"
 
 msgid "All entered values can be suffixed with a unit: %, B, KB, KiB, MB, MiB..."
 msgstr "يمكن إرفاق جميع القيم المدخلة بوحدة: ٪، ب، كيلوبايت، كيلوبايت، كيلوبايت، ميغابايت، ميغابايت، ميغابايت..."
@@ -1262,13 +1281,13 @@ msgid "Time syncronization not completing, while you wait - check the docs for w
 msgstr "عدم اكتمال مزامنة الوقت، أثناء الانتظار - راجع المستندات لمعرفة الحلول البديلة: https://archinstall.readthedocs.io/"
 
 msgid "Skipping waiting for automatic time sync (this can cause issues if time is out of sync during installation)"
-msgstr "تخطي انتظار المزامنة التلقائية للوقت (قد يتسبب ذلك في حدوث مشكلات إذا كان الوقت غير متزامن أثناء التثبيت)"
+msgstr "تخطي انتظار المزامنة التلقائية للوقت (قد يتسبب ذلك في حدوث مشكلات إذا كان الوقت غير متزامن أثناء التّثبيت)"
 
 msgid "Waiting for Arch Linux keyring sync (archlinux-keyring-wkd-sync) to complete."
 msgstr "في انتظار اكتمال مزامنة حلقة مفاتيح أرش لينكس (archlinux-keyring-wkd-sync)."
 
 msgid "Selected profiles: "
-msgstr "ملفات تعريف مختارة:  "
+msgstr "ملفّات تعريف مختارة:  "
 
 msgid "Time synchronization not completing, while you wait - check the docs for workarounds: https://archinstall.readthedocs.io/"
 msgstr "عدم اكتمال مزامنة الوقت، أثناء انتظارك - راجع المستندات لمعرفة الحلول: https://archinstall.readthedocs.io/"
@@ -1296,13 +1315,13 @@ msgid "LVM configuration type"
 msgstr "نوع إعداد LVM"
 
 msgid "LVM disk encryption with more than 2 partitions is currently not supported"
-msgstr "تشفير قرص LVM بأكثر من قسمين غير مدعوم حاليًا"
+msgstr "تشفير قرص LVM بأكثر من تقسيمين غير مدعوم حاليًا"
 
 msgid "Use NetworkManager (necessary to configure internet graphically in GNOME and KDE Plasma)"
-msgstr "استخدم مُدير الشبكة NetworkManager (ضروري لإعداد الإنترنت باستخدام واجهة رسومية في جنوم و كيدي)"
+msgstr "استخدم NetworkManager (ضروري لإعداد الإنترنت فالواجهات الرّسوميّة GNOME و KDE Plasma)"
 
 msgid "Select a LVM option"
-msgstr "حدد خيار LVM"
+msgstr "حدّد خيار LVM"
 
 msgid "Partitioning"
 msgstr "تقسيم"
@@ -1311,7 +1330,7 @@ msgid "Logical Volume Management (LVM)"
 msgstr "إدارة الحجم المنطقي (LVM)"
 
 msgid "Physical volumes"
-msgstr "أحجام فيزيائية"
+msgstr "أحجام فيزيائيّة"
 
 msgid "Volumes"
 msgstr "أحجام"
@@ -1323,10 +1342,10 @@ msgid "LVM volumes to be encrypted"
 msgstr "أقسام LVM المراد تشفيرها"
 
 msgid "Select which LVM volumes to encrypt"
-msgstr "حدد أقسام LVM المراد تشفيرها"
+msgstr "حدّد أقسام LVM المراد تشفيرها"
 
 msgid "Default layout"
-msgstr "التخطيط الافتراضي"
+msgstr "التّخطيط الأصلي"
 
 msgid "No Encryption"
 msgstr "لا تشفير"
@@ -1350,19 +1369,19 @@ msgid "Archinstall help"
 msgstr "مساعدة Archinstall"
 
 msgid " (default)"
-msgstr " (افتراضي)"
+msgstr " (أصلي)"
 
 msgid "Press Ctrl+h for help"
 msgstr "اضغط على Ctrl+h للحصول على المساعدة"
 
 msgid "Choose an option to give Sway access to your hardware"
-msgstr "حدد خياراً لمنح Sway إمكانية الوصول إلى أجهزتك"
+msgstr "حدّد خياراً لمنح Sway إمكانية الوصول إلى أجهزتك"
 
 msgid "Seat access"
 msgstr "الوصول إلى المقعد"
 
 msgid "Mountpoint"
-msgstr "نقطة الضمّ:"
+msgstr "نقطة التّثبيت"
 
 msgid "HSM"
 msgstr "HSM"
@@ -1371,25 +1390,25 @@ msgid "Enter disk encryption password (leave blank for no encryption)"
 msgstr "أدخل كلمة مرور تشفير القرص (اتركها فارغة لعدم وجود تشفير):"
 
 msgid "Disk encryption password"
-msgstr "كلمة سر التشفير"
+msgstr "كلمة سر التّشفير"
 
 msgid "Partition - New"
 msgstr "تقسيم - جديد"
 
 msgid "Filesystem"
-msgstr "نظام الملفات"
+msgstr "نظام الملفّات"
 
 msgid "Invalid size"
 msgstr "الحجم غير صالح"
 
 msgid "Start (default: sector {}): "
-msgstr "البداية (افتراضي: القطاع {}):  "
+msgstr "البداية (أصلي: القطاع {}):  "
 
 msgid "End (default: {}): "
-msgstr "النهاية (افتراضي: {}): "
+msgstr "النهاية (أصلي: {}): "
 
 msgid "Subvolume name"
-msgstr "اسم وحدة التخزين الفرعية"
+msgstr "اسم وحدة التّخزين الفرعيّة"
 
 msgid "Disk configuration type"
 msgstr "نوع ضبط القرص"
@@ -1398,7 +1417,7 @@ msgid "Root mount directory"
 msgstr "دليل جذر الضم"
 
 msgid "Select language"
-msgstr "حدد لغة"
+msgstr "حدّد لغة"
 
 msgid "Write additional packages to install (space separated, leave blank to skip)"
 msgstr "اكتب حزمًا إضافية لتثبيتها (تُفصَل بالمسافات، اتركها فارغة للتخطي):"
@@ -1444,7 +1463,7 @@ msgid "DNS servers"
 msgstr "خوادم DNS"
 
 msgid "Configure interfaces"
-msgstr "تهيئة الواجهات"
+msgstr "تهيئة الروابط"
 
 msgid "Kernel"
 msgstr "النواة"
@@ -1484,7 +1503,7 @@ msgstr "أدخل دليلا للتكوين (التكوينات) المراد ح�
 
 #, python-brace-format
 msgid "Do you want to save the configuration file(s) to {}?"
-msgstr "هل تريد حفظ ملف (ملفات) الضبط إلى {} ؟"
+msgstr "هل تريد حفظ ملفّ (ملفّات) الضبط إلى {} ؟"
 
 msgid "Enabled"
 msgstr "مفعّل"
@@ -1502,10 +1521,10 @@ msgid "Url"
 msgstr "عنوان URL"
 
 msgid "Select signature check"
-msgstr "حدد خيار التحقق من التوقيع"
+msgstr "حدّد خيار التحقق من التوقيع"
 
 msgid "Select execution mode"
-msgstr "حدد وضع التنفيذ"
+msgstr "حدّد وضع التنفيذ"
 
 msgid "Press ? for help"
 msgstr "اضغط ؟ للمساعدة"
@@ -1515,24 +1534,22 @@ msgid "Choose an option to give Hyprland access to your hardware"
 msgstr ""
 "\n"
 "\n"
-"حدد خيارًا لمنح Hyprland إمكانية الوصول إلى أجهزتك"
+"حدّد خيارًا لمنح Hyprland إمكانية الوصول إلى أجهزتك"
 
-#, fuzzy
 msgid "Additional repositories"
-msgstr "المستودعات الاختيارية"
+msgstr "المستودعات الإضافيّة"
 
 msgid "NTP"
-msgstr ""
+msgstr "NTP (بروتوكول وقت الشّبكة)"
 
 msgid "Swap on zram"
-msgstr ""
+msgstr "مُبادَلة على zram"
 
 msgid "Name"
-msgstr ""
+msgstr "الإسم"
 
-#, fuzzy
 msgid "Signature check"
-msgstr "حدد خيار التحقق من التوقيع"
+msgstr "التّحقّق من التّوقيع"
 
 #, fuzzy, python-brace-format
 msgid "Selected free space segment on device {}:"
@@ -1544,352 +1561,673 @@ msgstr "الإجمالي: {} / {}"
 
 #, fuzzy, python-brace-format
 msgid "Size (default: {}): "
-msgstr "النهاية (افتراضي: {}): "
+msgstr "النهاية (أصلي: {}): "
 
-#, fuzzy
 msgid "HSM device"
-msgstr "جهاز"
+msgstr "جهاز HSM"
 
 msgid "Some packages could not be found in the repository"
-msgstr ""
+msgstr "لم يتمّ العثور على بعض الحزم في المستودع"
 
-#, fuzzy
 msgid "User"
-msgstr "اسم المستخدم"
+msgstr "مستخدم"
 
 msgid "The specified configuration will be applied"
-msgstr ""
+msgstr "سيتم تطبيق التّكوين المُحدّد"
 
 msgid "Wipe"
-msgstr ""
+msgstr "طمس"
 
-#, fuzzy
 msgid "Mark/Unmark as XBOOTLDR"
-msgstr "وضع او إلغاء علامة قابل للإقلاع"
+msgstr "وضع او إلغاء علامة قابل للإقلاع (XBOOTLDR)"
 
-#, fuzzy
 msgid "Loading packages..."
-msgstr "الباقات الإضافية"
+msgstr "تحميل الحزم جارٍ"
 
 msgid "Select any packages from the below list that should be installed additionally"
-msgstr ""
+msgstr "اختر أيّ حزم إضافيّة، من القائمة أدناه، ترغب بتثبيتها"
 
-#, fuzzy
 msgid "Add a custom repository"
-msgstr "إضافة مرآة مخصصة"
+msgstr "إضافة مستودع مخصّص"
 
-#, fuzzy
 msgid "Change custom repository"
-msgstr "تغيير المرآة المخصصة"
+msgstr "تغيير المستودع المخصّص"
 
-#, fuzzy
 msgid "Delete custom repository"
-msgstr "حذف المرآة المخصصة"
+msgstr "حذف المستودع المخصّص"
 
-#, fuzzy
 msgid "Repository name"
-msgstr "اسم المرآة"
+msgstr "اسم المستودع"
 
-#, fuzzy
 msgid "Add a custom server"
-msgstr "إضافة مرآة مخصصة"
+msgstr "إضافة خادم مخصّص"
 
-#, fuzzy
 msgid "Change custom server"
-msgstr "تغيير المرآة المخصصة"
+msgstr "تغيير الخادم المخصّص"
 
-#, fuzzy
 msgid "Delete custom server"
-msgstr "حذف المرآة المخصصة"
+msgstr "حذف الخادم المخصّص"
 
 msgid "Server url"
-msgstr ""
+msgstr "عنوان الخادم (URL)"
 
-#, fuzzy
 msgid "Select regions"
-msgstr "حدد خيار التوقيع"
+msgstr "اختر المناطق"
 
-#, fuzzy
 msgid "Add custom servers"
-msgstr "إضافة مرآة مخصصة"
+msgstr "إضافة خوادم مخصّصة"
 
-#, fuzzy
 msgid "Add custom repository"
-msgstr "إضافة مرآة مخصصة"
+msgstr "إضافة مستودع مخصّص"
 
-#, fuzzy
 msgid "Loading mirror regions..."
-msgstr "مناطق المرايا"
+msgstr "تحميل مناطق المرايا…"
 
-#, fuzzy
 msgid "Mirrors and repositories"
-msgstr "المستودعات الاختيارية"
+msgstr "المرايا والمستودعات"
 
-#, fuzzy
 msgid "Selected mirror regions"
-msgstr "مناطق المرايا"
+msgstr "مناطق المرايا المختارة"
 
-#, fuzzy
 msgid "Custom servers"
-msgstr "مرايا مخصصة"
+msgstr "خوادم مخصّصة"
 
-#, fuzzy
 msgid "Custom repositories"
-msgstr "المستودعات الاختيارية"
+msgstr "مستودعات مخصّصة"
 
 msgid "Only ASCII characters are supported"
-msgstr ""
+msgstr "يتم دعم أحرف ASCII فقط"
 
 msgid "Show help"
-msgstr ""
+msgstr "إظهار المساعدة"
 
 msgid "Exit help"
-msgstr ""
+msgstr "خروج من المساعدة"
 
 msgid "Preview scroll up"
-msgstr ""
+msgstr "مرّر المُعايَنة للأعلى"
 
 msgid "Preview scroll down"
-msgstr ""
+msgstr "مرّر المُعايَنة للأسفل"
 
 msgid "Move up"
-msgstr ""
+msgstr "اصعد لفوق"
 
 msgid "Move down"
-msgstr ""
+msgstr "انزل لأسفل"
 
 msgid "Move right"
-msgstr ""
+msgstr "تحرّك يمينًا"
 
 msgid "Move left"
-msgstr ""
+msgstr "تحرّك يسارًا"
 
 msgid "Jump to entry"
-msgstr ""
+msgstr "انتقل إلى الصّفحة"
 
 msgid "Skip selection (if available)"
-msgstr ""
+msgstr "تخطّي الاختيار (إن وُجَد)"
 
 msgid "Reset selection (if available)"
-msgstr ""
+msgstr "إعادة ضبط الاختيار (إن وُجَد)"
 
-#, fuzzy
 msgid "Select on single select"
-msgstr "حدد خيار التحقق من التوقيع"
+msgstr "حدّد باستخدام التّحديد الفردي"
 
-#, fuzzy
 msgid "Select on multi select"
-msgstr "حدِّد منطقة زمنية"
+msgstr "حدّد باستخدام التّحديد المتعدّد"
 
 msgid "Reset"
-msgstr ""
+msgstr "إعادة ضبط"
 
-#, fuzzy
 msgid "Skip selection menu"
-msgstr "حدد وضع التنفيذ"
+msgstr "تخطي قائمة الاختيار"
 
 msgid "Start search mode"
-msgstr ""
+msgstr "ابدأ وضع البحث"
 
 msgid "Exit search mode"
+msgstr "أنهي وضع البحث"
+
+msgid "General"
 msgstr ""
 
 #, fuzzy
+msgid "Navigation"
+msgstr "حفظ الإعدادات"
+
+#, fuzzy
+msgid "Selection"
+msgstr "اختر المناطق"
+
+msgid "Search"
+msgstr ""
+
+msgid "Down"
+msgstr ""
+
+msgid "Up"
+msgstr ""
+
+#, fuzzy
+msgid "Confirm"
+msgstr "تأكيد وخروج"
+
+#, fuzzy
+msgid "Focus right"
+msgstr "تحرّك يمينًا"
+
+#, fuzzy
+msgid "Focus left"
+msgstr "تحرّك يسارًا"
+
+msgid "Toggle"
+msgstr ""
+
+#, fuzzy
+msgid "Show/Hide help"
+msgstr "إظهار المساعدة"
+
+msgid "Quit"
+msgstr ""
+
+msgid "First"
+msgstr ""
+
+msgid "Last"
+msgstr ""
+
+#, fuzzy
+msgid "Select"
+msgstr "اختر المناطق"
+
+msgid "Page Up"
+msgstr ""
+
+msgid "Page Down"
+msgstr ""
+
+#, fuzzy
+msgid "Page up"
+msgstr "مجموعة الحزم:"
+
+#, fuzzy
+msgid "Page down"
+msgstr "انزل لأسفل"
+
+msgid "Page Left"
+msgstr ""
+
+#, fuzzy
+msgid "Page Right"
+msgstr "تحرّك يمينًا"
+
+msgid "Cursor up"
+msgstr ""
+
+#, fuzzy
+msgid "Cursor down"
+msgstr "انزل لأسفل"
+
+#, fuzzy
+msgid "Cursor right"
+msgstr "تحرّك يمينًا"
+
+#, fuzzy
+msgid "Cursor left"
+msgstr "تحرّك يسارًا"
+
+msgid "Top"
+msgstr ""
+
+msgid "Bottom"
+msgstr ""
+
+msgid "Home"
+msgstr ""
+
+#, fuzzy
+msgid "End"
+msgstr "مفعّل"
+
+#, fuzzy
+msgid "Toggle option"
+msgstr "خيارات وحدة التّخزين الفرعيّة"
+
+msgid "Scroll Up"
+msgstr ""
+
+#, fuzzy
+msgid "Scroll Down"
+msgstr "مرّر المُعايَنة للأسفل"
+
+msgid "Scroll Left"
+msgstr ""
+
+msgid "Scroll Right"
+msgstr ""
+
+msgid "Scroll Home"
+msgstr ""
+
+msgid "Scroll End"
+msgstr ""
+
+msgid "Focus Next"
+msgstr ""
+
+msgid "Focus Previous"
+msgstr ""
+
+msgid "Copy selected text"
+msgstr ""
+
 msgid "labwc needs access to your seat (collection of hardware devices i.e. keyboard, mouse, etc)"
-msgstr "يحتاج Sway إلى الوصول إلى مقعدك (مجموعة من الأجهزة مثل لوحة المفاتيح والماوس وغيرها)"
+msgstr "يحتاج labwc للوصول إلى مقعدك (مجموعة أجهزة مثل لوحة المفاتيح، والفأرة وغيرها)"
 
-#, fuzzy
 msgid "Choose an option to give labwc access to your hardware"
-msgstr "حدد خياراً لمنح Sway إمكانية الوصول إلى أجهزتك"
+msgstr "حدّد خيارًا لمنح labwc إمكانية الوصول إلى أجهزتك"
 
-#, fuzzy
 msgid "niri needs access to your seat (collection of hardware devices i.e. keyboard, mouse, etc)"
-msgstr "يحتاج Sway إلى الوصول إلى مقعدك (مجموعة من الأجهزة مثل لوحة المفاتيح والماوس وغيرها)"
+msgstr "يحتاج niri للوصول إلى مقعدك (مجموعة أجهزة مثل لوحة المفاتيح، والفأرة وغيرها)"
 
-#, fuzzy
 msgid "Choose an option to give niri access to your hardware"
-msgstr "حدد خياراً لمنح Sway إمكانية الوصول إلى أجهزتك"
+msgstr "حدّد خيارًا لمنح niri إمكانية الوصول إلى أجهزتك"
 
-#, fuzzy
 msgid "Mark/Unmark as ESP"
-msgstr "وضع او إلغاء علامة قابل للإقلاع"
+msgstr "وضع او إلغاء علامة ESP"
 
 msgid "Package group:"
-msgstr ""
+msgstr "مجموعة الحزم:"
 
-#, fuzzy
 msgid "Exit archinstall"
-msgstr "مساعدة Archinstall"
+msgstr "الخروج من Archinstall"
 
-#, fuzzy
 msgid "Reboot system"
-msgstr "نظام الملفات"
+msgstr "أعد تشغيل النظام"
 
-#, fuzzy
 msgid "chroot into installation for post-installation configurations"
-msgstr "هل ترغب في الانتقال (chroot) إلى التثبيت الذي تم إنشاؤه حديثاً وإجراء تهيئة ما بعد التثبيت؟"
+msgstr "قم بتغيير بيئة التّثبيت (chroot) لإجراءات ما بعد التّثبيت"
 
 msgid "Installation completed"
-msgstr ""
+msgstr "انتهى التّثبيت"
 
-#, fuzzy
 msgid "What would you like to do next?"
-msgstr "هل ترغب في الاستمرار؟"
+msgstr "ماذا تريد أن تفعل بعد ذلك؟"
 
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "Select which mode to configure for \"{}\""
-msgstr "حدد الوضع المراد تهيئته لـ\"{}\" أو تخطى لاستخدام الوضع الافتراضي \"{}\""
+msgstr "حدّد الوضع الذي تريد ضبطه لـ \"{}\""
 
-#, fuzzy
 msgid "Incorrect credentials file decryption password"
-msgstr "كلمة سر التشفير"
+msgstr "كلمة مرور فك تشفير ملفّ بيانات الاعتماد غير صحيحة"
 
-#, fuzzy
 msgid "Incorrect password"
-msgstr "كلمة مرور الجذر"
+msgstr "كلمة مرور خاطئة"
 
-#, fuzzy
 msgid "Credentials file decryption password"
-msgstr "كلمة سر التشفير"
+msgstr "كلمة مرور فك تشفير ملفّ بيانات الاعتماد"
 
-#, fuzzy
 msgid "Do you want to encrypt the user_credentials.json file?"
-msgstr "هل تريد حفظ ملف (ملفات) الضبط إلى {} ؟"
+msgstr "هل تريد تشفير الملف user_credentials.json؟"
 
-#, fuzzy
 msgid "Credentials file encryption password"
-msgstr "كلمة سر التشفير"
+msgstr "كلمة مرور تشفير ملفّ بيانات الاعتماد"
 
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "Repositories: {}"
-msgstr "اسم المرآة"
+msgstr "المستودعات: {}"
 
-#, fuzzy
 msgid "New version available"
-msgstr "لا توجد أجهزة HSM متوفرة"
+msgstr "يتوفر إصدار جديد"
 
-#, fuzzy
 msgid "Passwordless login"
-msgstr "كلمة المرور"
+msgstr "تسجيل دخول بدون كلمة مرور"
 
 msgid "Second factor login"
-msgstr ""
+msgstr "تسجيل الدّخول باستخدام عامل ثانٍ"
 
 msgid "Bluetooth"
-msgstr ""
+msgstr "Bluetooth"
 
-#, fuzzy
 msgid "Would you like to configure Bluetooth?"
-msgstr "هل ترغب في الاستمرار؟"
+msgstr "هل ترغب في ضبط إعدادات Bluetooth؟"
+
+msgid "Print service"
+msgstr "خدمة الطّباعة"
+
+msgid "Would you like to configure the print service?"
+msgstr "هل ترغب في ضبط إعدادات خدمة الطباعة؟"
+
+msgid "Power management"
+msgstr "إدارة الطّاقة"
 
 msgid "Authentication"
-msgstr ""
+msgstr "المُصادَقة"
 
 msgid "Applications"
-msgstr ""
+msgstr "التّطبيقات"
 
 msgid "U2F login method: "
-msgstr ""
+msgstr "طريقة تسجيل الدّخول U2F: "
 
 msgid "Passwordless sudo: "
-msgstr ""
+msgstr "sudo دون كلمة مرور: "
 
 #, python-brace-format
 msgid "Btrfs snapshot type: {}"
-msgstr ""
+msgstr "نوع لقطة Btrfs: {}"
 
 msgid "Syncing the system..."
-msgstr ""
+msgstr "مزامنة النّظام…"
 
 msgid "Value cannot be empty"
-msgstr ""
+msgstr "لا ينبغي أن تكون القيمة فارغة"
 
 msgid "Snapshot type"
-msgstr ""
+msgstr "نوع اللّقطة"
 
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "Snapshot type: {}"
-msgstr "نوع البيئة: {}"
+msgstr "نوع اللّقطة: {}"
 
 msgid "U2F login setup"
-msgstr ""
+msgstr "إعداد تسجيل الدّخول إلى U2F"
 
 msgid "No U2F devices found"
-msgstr ""
+msgstr "لم يتمّ العثور على أجهزة U2F"
 
 msgid "U2F Login Method"
-msgstr ""
+msgstr "طريقة تسجيل الدّخول U2F"
 
-#, fuzzy
 msgid "Enable passwordless sudo?"
-msgstr "أدخل كلمة مرور: "
+msgstr "تفعيل sudo دون كلمة مرور؟"
 
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "Setting up U2F device for user: {}"
-msgstr "اختر جهاز FIDO2 لاستخدامه في HSM"
+msgstr "إعداد جهاز U2F للمستخدم: {}"
 
 msgid "You may need to enter the PIN and then touch your U2F device to register it"
-msgstr ""
+msgstr "قد تحتاج إلى إدخال رمز PIN ثم لمس جهازك U2F لتسجيله"
 
 msgid "Starting device modifications in "
-msgstr ""
+msgstr "بدء تعديلات الجهاز في "
 
-#, fuzzy
 msgid "No network connection found"
-msgstr "لا يوجد إعداد للشبكة"
+msgstr "لم يتم العثور على اتصال بالشبكة"
 
-#, fuzzy
 msgid "Would you like to connect to a Wifi?"
-msgstr "هل ترغب في الاستمرار؟"
+msgstr "هل ترغب في الاتصال بشبكة WiFi؟"
 
-#, fuzzy
 msgid "No wifi interface found"
-msgstr "تهيئة الواجهات"
+msgstr "لم يتم العثور على ربط WiFi"
 
-#, fuzzy
 msgid "Select wifi network to connect to"
-msgstr "حدِّد واجهة شبكة واحدة للإعداد"
+msgstr "اختر شبكة WiFi للإتصال بها"
 
 msgid "Scanning wifi networks..."
-msgstr ""
+msgstr "مسح شبكات الـ WiFi"
 
-#, fuzzy
 msgid "No wifi networks found"
-msgstr "لا يوجد إعداد للشبكة"
+msgstr "لم يتم العثور على شبكات WiFi"
 
 msgid "Failed setting up wifi"
+msgstr "فشل إعداد شبكة الـ WiFi"
+
+msgid "Enter wifi password"
+msgstr "أدخل كلمة مرور الـ WiFi"
+
+msgid "Ok"
+msgstr "حسنًا"
+
+msgid "Removable"
+msgstr "قابِل للنّقل"
+
+msgid "Install to removable location"
+msgstr "ثبِّت في مكان قابل للنّقل"
+
+msgid "Will install to /EFI/BOOT/ (removable location)"
+msgstr "سوف يتمّ التّثبيت في /EFI/BOOT/ (مكان قابل للنّقل)"
+
+msgid "Will install to standard location with NVRAM entry"
+msgstr "سيتم التّثبيت في الموقع القياسي مع عنصر NVRAM"
+
+msgid "Would you like to install the bootloader to the default removable media search location?"
+msgstr "هل ترغب في تثبيت برنامج الإقلاع في الموقع الأصلي للبحث عن الوسائط القابلة للنّقل؟"
+
+msgid "This installs the bootloader to /EFI/BOOT/BOOTX64.EFI (or similar) which is useful for:"
+msgstr "يُثَبَّتُ برنامج الإقلاع في /EFI/BOOT/BOOTX64.EFI (أو ما شابه ذلك)، وهو أمر مفيد لـ:"
+
+msgid "USB drives or other portable external media."
+msgstr "محرّكات أقراص USB أو وسائط تخزين خارجيّة محمولة أخرى."
+
+msgid "Systems where you want the disk to be bootable on any computer."
+msgstr "الأنظمة أين يكون القرص قابلاً للتّشغيل على أيّ حاسوب."
+
+msgid "Firmware that does not properly support NVRAM boot entries."
+msgstr "البرامج الثابتة التي لا تدعم بشكل صحيح إدخالات تمهيد NVRAM"
+
+msgid "Will install to /EFI/BOOT/ (removable location, safe default)"
+msgstr "سيتمّ التّثبيت في /EFI/BOOT/ (موقع قابل للنّقل، إعداد أصلي آمن)"
+
+msgid "Will install to custom location with NVRAM entry"
+msgstr "سيتم التّثبيت في موقع مخصّص مع إدخال NVRAM"
+
+msgid "Firmware that does not properly support NVRAM boot entries like most MSI motherboards,"
+msgstr "البرامج الثّابتة التي لا تدعم بشكل صحيح إدخالات تمهيد NVRAM مثل معظم لوحات الأمّ من MSI،"
+
+msgid "most Apple Macs, many laptops..."
+msgstr "معظم أجهزة Mac من Apple، والعديد من الحواسيب المحمولة…"
+
+msgid "Language"
+msgstr "اللّغة"
+
+msgid "Compression algorithm"
+msgstr "خوارزميّة الضّغط"
+
+msgid "Only packages such as base, sudo, linux, linux-firmware, efibootmgr and optional profile packages are installed."
+msgstr "يتم تثبيت حزم مثل base و sudo و linux و linux-firmware و efibootmgr وحزم الملفّات الشّخصية الاختياريّة فقط."
+
+msgid "Select zram compression algorithm:"
+msgstr "حدّد خوارزميّة ضغط zram:"
+
+msgid "Use Network Manager (default backend)"
+msgstr "استخدم Network Manager (الخادم الخلفي الأصلي)"
+
+msgid "Use Network Manager (iwd backend)"
+msgstr "استخدم Network Manager (الخادم الخلفي iwd)"
+
+msgid "Firewall"
+msgstr "جدار الحماية"
+
+#, fuzzy
+msgid "Additional fonts"
+msgstr "المستودعات الإضافيّة"
+
+#, fuzzy
+msgid "Select font packages to install"
+msgstr "اختر برنامج الإقلاع المُراد تثبيته"
+
+msgid "Unicode font coverage for most languages"
+msgstr ""
+
+msgid "color emoji for browsers and apps"
+msgstr ""
+
+msgid "Chinese, Japanese, Korean characters"
+msgstr ""
+
+msgid "Select audio configuration"
+msgstr "حدّد إعدادات الصوت"
+
+msgid "Enter credentials file decryption password"
+msgstr "أدخل كلمة مرور فك تشفير ملفّ بيانات الاعتماد"
+
+msgid "Enter root password"
+msgstr "أدخل كلمة مرور root"
+
+msgid "Select bootloader to install"
+msgstr "اختر برنامج الإقلاع المُراد تثبيته"
+
+msgid "Configuration preview"
+msgstr "معاينة الإعدادات"
+
+msgid "Enter a directory for the configuration(s) to be saved"
+msgstr "أدخل مجلدًا لحفظ الإعدادات المراد حفظها"
+
+msgid "Select encryption type"
+msgstr "حدّد نوع التّشفير"
+
+msgid "Select disks for the installation"
+msgstr "حدّد الأقراص للتّثبيت"
+
+msgid "Enter a mountpoint"
+msgstr "حدّد نقطة تثبيت"
+
+#, python-brace-format
+msgid "Enter a size (default: {}): "
+msgstr "أدخل المساحة (أصلي: {}): "
+
+msgid "Enter subvolume name"
+msgstr "اسم وحدة التّخزين الفرعيّة"
+
+msgid "Enter subvolume mountpoint"
+msgstr "نقطة تثبيت وحدة التّخزين الفرعيّة"
+
+msgid "Select a disk configuration"
+msgstr "ضبط القرص"
+
+msgid "Enter root mount directory"
+msgstr "أدخل الدليل الجذر لنقاط التثبيت"
+
+msgid "You will use whatever drive-setup is mounted at the specified directory"
+msgstr "ستستخدم أيّ إعداد محرّك أقراص مثبَّت في الدّليل المحدّد"
+
+msgid "WARNING: Archinstall won't check the suitability of this setup"
+msgstr "تحذير: لن يتحقّق برنامج Archinstall من مدى ملاءمة هذا الإعداد"
+
+msgid "Select main filesystem"
+msgstr "اختر نظام الملفّات الرّئيسي"
+
+msgid "Enter a hostname"
+msgstr "أدخل اسم الحاسوب"
+
+msgid "Select timezone"
+msgstr "حدِّد المنطقة الزّمنية"
+
+#, fuzzy
+msgid "Enter the number of parallel downloads to be enabled"
+msgstr ""
+"أدخل عدد التنزيلات المتوازية المراد تمكينها.\n"
+"\n"
+"ملاحظة:\n"
+
+#, python-brace-format
+msgid "Value must be between 1 and {}"
+msgstr "يجب أن تكون القيمة بين 1 و {}"
+
+msgid "Select which kernel(s) to install"
+msgstr "حدّد النّوى التي تريد تثبيتها"
+
+msgid "Enter a respository name"
+msgstr "أدخل اسم المستودع"
+
+msgid "Enter the repository url"
+msgstr "أدخل عنوان URL للمستودع"
+
+msgid "Enter server url"
+msgstr "أدخل عنوان الخادم (URL)"
+
+msgid "Select mirror regions to be enabled"
+msgstr "حدّد مناطق المرايا المراد تفعيلها"
+
+msgid "Select optional repositories to be enabled"
+msgstr "اختر المستودعات الاختيارية التي تريد تمكينها"
+
+msgid "Select an interface"
+msgstr "حدّد الرّبط"
+
+msgid "Choose network configuration"
+msgstr "اختر إعدادات الشّبكة"
+
+msgid "No packages found"
+msgstr "لم يتم العثور على أيّ حزم"
+
+msgid "Select which greeter to install"
+msgstr "اختر المُرحِّب الذي سيتم تثبيته"
+
+msgid "Select a profile type"
+msgstr "حدد نوع الملف الشخصي"
+
+msgid "Enter new password"
+msgstr "أدخل كلمة مرور جديدة"
+
+msgid "Enter a username"
+msgstr "أدخل اسم المستخدم"
+
+msgid "Enter a password"
+msgstr "أدخل كلمة مرور"
+
+msgid "The password did not match, please try again"
+msgstr "كلمة المرور التأكيدية غير متطابقة، ترجى المحاولة مرة أخرى"
+
+msgid "Password strength: Weak"
+msgstr "قوة كلمة المرور: ضعيفة"
+
+msgid "Password strength: Moderate"
+msgstr "قوة كلمة المرور: متوسطة"
+
+msgid "Password strength: Strong"
+msgstr "قوة كلمة المرور: قوية"
+
+msgid "The selected desktop profile requires a regular user to log in via the greeter"
+msgstr "يتطلب ملفّ تعريف سطح المكتب المحدّد من المستخدم العادي تسجيل الدخول عبر لوحة الترحيب"
+
+#, fuzzy, python-brace-format
+msgid "Environment type: {} {}"
+msgstr "نوع البيئة: {}"
+
+#, fuzzy
+msgid "Input cannot be empty"
+msgstr "لا ينبغي أن تكون القيمة فارغة"
+
+msgid "Recommended"
 msgstr ""
 
 #, fuzzy
-msgid "Enter wifi password"
-msgstr "أدخل كلمة مرور: "
+msgid "Package"
+msgstr "مجموعة الحزم:"
 
-msgid "Ok"
+msgid "Curated selection of KDE Plasma packages"
 msgstr ""
 
-msgid "Removable"
+msgid "Dependencies"
 msgstr ""
 
-msgid "Install to removable location"
+#, fuzzy
+msgid "Package group"
+msgstr "مجموعة الحزم:"
+
+msgid "Extensive KDE Plasma installation"
 msgstr ""
 
-msgid "Will install to /EFI/BOOT/ (removable location)"
+#, fuzzy
+msgid "Packages in group"
+msgstr "مجموعة الحزم:"
+
+msgid "Minimal KDE Plasma installation"
 msgstr ""
 
-msgid "Will install to standard location with NVRAM entry"
+#, fuzzy
+msgid "Description"
+msgstr "تشفير القرص "
+
+#, fuzzy
+msgid "Select a flavor of KDE Plasma to install"
+msgstr "اختر برنامج الإقلاع المُراد تثبيته"
+
+msgid "Arial/Times/Courier replacement, Cyrillic support for Steam/games"
 msgstr ""
 
-msgid "Would you like to install the bootloader to the default removable media search location?"
-msgstr ""
-
-msgid "This installs the bootloader to /EFI/BOOT/BOOTX64.EFI (or similar) which is useful for:"
-msgstr ""
-
-msgid "USB drives or other portable external media."
-msgstr ""
-
-msgid "Systems where you want the disk to be bootable on any computer."
-msgstr ""
-
-msgid "Firmware that does not properly support NVRAM boot entries."
+msgid "wide Unicode coverage, good fallback font"
 msgstr ""

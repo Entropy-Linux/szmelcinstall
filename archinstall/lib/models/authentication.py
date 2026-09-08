@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, NotRequired, TypedDict
+from typing import Any, NotRequired, Self, TypedDict, override
 
+from archinstall.lib.models.config import SubConfig
 from archinstall.lib.models.users import Password, User
 from archinstall.lib.translationhandler import tr
 
@@ -40,14 +41,14 @@ class U2FLoginConfiguration:
 			'passwordless_sudo': self.passwordless_sudo,
 		}
 
-	@staticmethod
-	def parse_arg(args: U2FLoginConfigSerialization) -> 'U2FLoginConfiguration | None':
+	@classmethod
+	def parse_arg(cls, args: U2FLoginConfigSerialization) -> Self | None:
 		u2f_login_method = args.get('u2f_login_method')
 
-		if u2f_login_method is None:
+		if not u2f_login_method:
 			return None
 
-		u2f_config = U2FLoginConfiguration(u2f_login_method=U2FLoginMethod(u2f_login_method))
+		u2f_config = cls(u2f_login_method=U2FLoginMethod(u2f_login_method))
 
 		u2f_config.u2f_login_method = U2FLoginMethod(u2f_login_method)
 
@@ -58,14 +59,14 @@ class U2FLoginConfiguration:
 
 
 @dataclass
-class AuthenticationConfiguration:
+class AuthenticationConfiguration(SubConfig):
 	root_enc_password: Password | None = None
 	users: list[User] = field(default_factory=list)
 	u2f_config: U2FLoginConfiguration | None = None
 
-	@staticmethod
-	def parse_arg(args: dict[str, Any]) -> 'AuthenticationConfiguration':
-		auth_config = AuthenticationConfiguration()
+	@classmethod
+	def parse_arg(cls, args: dict[str, Any]) -> Self:
+		auth_config = cls()
 
 		if (u2f_config := args.get('u2f_config')) is not None:
 			auth_config.u2f_config = U2FLoginConfiguration.parse_arg(u2f_config)
@@ -75,6 +76,7 @@ class AuthenticationConfiguration:
 
 		return auth_config
 
+	@override
 	def json(self) -> AuthenticationSerialization:
 		config: AuthenticationSerialization = {}
 
@@ -82,3 +84,24 @@ class AuthenticationConfiguration:
 			config['u2f_config'] = self.u2f_config.json()
 
 		return config
+
+	@override
+	def summary(self) -> list[str]:
+		out: list[str] = []
+
+		if self.root_enc_password:
+			out.append(tr('Root password set'))
+
+		if self.users:
+			out.append(tr('Configured {} user(s)').format(len(self.users)))
+
+		if self.u2f_config:
+			out.append(tr('U2F set up'))
+
+		return out
+
+	def has_superuser(self) -> bool:
+		return any(u.sudo for u in self.users)
+
+	def has_regular_user(self) -> bool:
+		return len(self.users) > 0

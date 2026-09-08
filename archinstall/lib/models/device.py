@@ -1,22 +1,20 @@
-from __future__ import annotations
-
+import builtins
 import math
 import uuid
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import Enum, StrEnum, auto
 from pathlib import Path
-from typing import NotRequired, TypedDict, override
+from typing import Any, NotRequired, Self, TypedDict, override
 from uuid import UUID
 
 import parted
 from parted import Disk, Geometry, Partition
 from pydantic import BaseModel, Field, ValidationInfo, field_serializer, field_validator
 
+from archinstall.lib.log import debug
+from archinstall.lib.models.config import SubConfig
+from archinstall.lib.models.users import Password
 from archinstall.lib.translationhandler import tr
-
-from ..hardware import SysInfo
-from ..models.users import Password
-from ..output import debug
 
 ENC_IDENTIFIER = 'ainst'
 DEFAULT_ITER_TIME = 10000
@@ -36,6 +34,15 @@ class DiskLayoutType(Enum):
 			case DiskLayoutType.Pre_mount:
 				return tr('Pre-mounted configuration')
 
+	def short_msg(self) -> str:
+		match self:
+			case DiskLayoutType.Default:
+				return tr('Default')
+			case DiskLayoutType.Manual:
+				return tr('Manual')
+			case DiskLayoutType.Pre_mount:
+				return tr('Pre-mount')
+
 
 class _DiskLayoutConfigurationSerialization(TypedDict):
 	config_type: str
@@ -47,7 +54,7 @@ class _DiskLayoutConfigurationSerialization(TypedDict):
 
 
 @dataclass
-class DiskLayoutConfiguration:
+class DiskLayoutConfiguration(SubConfig):
 	config_type: DiskLayoutType
 	device_modifications: list[DeviceModification] = field(default_factory=list)
 	lvm_config: LvmConfiguration | None = None
@@ -57,6 +64,7 @@ class DiskLayoutConfiguration:
 	# used for pre-mounted config
 	mountpoint: Path | None = None
 
+	@override
 	def json(self) -> _DiskLayoutConfigurationSerialization:
 		if self.config_type == DiskLayoutType.Pre_mount:
 			return {
@@ -80,12 +88,34 @@ class DiskLayoutConfiguration:
 
 			return config
 
+	@override
+	def summary(self) -> list[str]:
+		out = [tr('{} layout').format(self.config_type.short_msg())]
+
+		devices = {mod.device_path for mod in self.device_modifications}
+
+		if devices:
+			dev_str = ', '.join(str(d) for d in devices)
+			out.append(tr('Devices {}').format(dev_str))
+
+			if self.lvm_config is not None:
+				out.append(tr('LVM set up'))
+
+		if self.disk_encryption is not None:
+			out.append(tr('{} encryption').format(self.disk_encryption.encryption_type.type_to_text()))
+
+		if self.btrfs_options is not None:
+			if self.btrfs_options.snapshot_config:
+				out.append(tr('Btrfs snapshot "{}"').format(self.btrfs_options.snapshot_config.snapshot_type))
+
+		return out
+
 	@classmethod
 	def parse_arg(
 		cls,
 		disk_config: _DiskLayoutConfigurationSerialization,
 		enc_password: Password | None = None,
-	) -> DiskLayoutConfiguration | None:
+	) -> Self | None:
 		from archinstall.lib.disk.device_handler import device_handler
 
 		device_modifications: list[DeviceModification] = []
@@ -94,7 +124,7 @@ class DiskLayoutConfiguration:
 		if not config_type:
 			raise ValueError('Missing disk layout configuration: config_type')
 
-		config = DiskLayoutConfiguration(
+		config = cls(
 			config_type=DiskLayoutType(config_type),
 			device_modifications=device_modifications,
 		)
@@ -133,9 +163,14 @@ class DiskLayoutConfiguration:
 			for partition in entry.get('partitions', []):
 				flags = [flag for f in partition.get('flags', []) if (flag := PartitionFlag.from_string(f))]
 
+				if fs_type := partition.get('fs_type'):
+					fs_type = FilesystemType(fs_type)
+				else:
+					fs_type = None
+
 				device_partition = PartitionModification(
 					status=ModificationStatus(partition['status']),
-					fs_type=FilesystemType(partition['fs_type']) if partition.get('fs_type') else None,
+					fs_type=fs_type,
 					start=Size.parse_args(partition['start']),
 					length=Size.parse_args(partition['size']),
 					mount_options=partition['mount_options'],
@@ -161,15 +196,15 @@ class DiskLayoutConfiguration:
 				continue
 
 			first = non_delete_partitions[0]
-			if first.status == ModificationStatus.Create and not first.start.is_valid_start():
+			if first.status == ModificationStatus.CREATE and not first.start.is_valid_start():
 				raise ValueError('First partition must start at no less than 1 MiB')
 
 			for i, current_partition in enumerate(non_delete_partitions[1:], start=1):
 				previous_partition = non_delete_partitions[i - 1]
-				if current_partition.status == ModificationStatus.Create and current_partition.start < previous_partition.end:
+				if current_partition.status == ModificationStatus.CREATE and current_partition.start < previous_partition.end:
 					raise ValueError('Partitions overlap')
 
-			create_partitions = [part_mod for part_mod in non_delete_partitions if part_mod.status == ModificationStatus.Create]
+			create_partitions = [part_mod for part_mod in non_delete_partitions if part_mod.status == ModificationStatus.CREATE]
 
 			if not create_partitions:
 				continue
@@ -200,13 +235,13 @@ class DiskLayoutConfiguration:
 		return config
 
 	def has_default_btrfs_vols(self) -> bool:
-		if self.config_type == DiskLayoutType.Default:
-			for mod in self.device_modifications:
-				for part in mod.partitions:
-					if part.is_create_or_modify():
-						if part.fs_type == FilesystemType.Btrfs:
-							if len(part.btrfs_subvols) > 0:
-								return True
+		for mod in self.device_modifications:
+			for part in mod.partitions:
+				if not (part.is_create_or_modify() and part.fs_type == FilesystemType.BTRFS):
+					continue
+
+				if any(subvol.is_default_root() for subvol in part.btrfs_subvols):
+					return True
 
 		return False
 
@@ -220,10 +255,6 @@ class PartitionTable(Enum):
 
 	def is_mbr(self) -> bool:
 		return self == PartitionTable.MBR
-
-	@classmethod
-	def default(cls) -> PartitionTable:
-		return cls.GPT if SysInfo.has_uefi() else cls.MBR
 
 
 class Units(Enum):
@@ -253,17 +284,17 @@ class Unit(Enum):
 
 	sectors = 'sectors'  # size in sector
 
-	@staticmethod
-	def get_all_units() -> list[str]:
-		return [u.name for u in Unit]
+	@classmethod
+	def get_all_units(cls) -> list[str]:
+		return [u.name for u in cls]
 
-	@staticmethod
-	def get_si_units() -> list[Unit]:
-		return [u for u in Unit if 'i' not in u.name and u.name != 'sectors']
+	@classmethod
+	def get_si_units(cls) -> list[Self]:
+		return [u for u in cls if 'i' not in u.name and u.name != 'sectors']
 
-	@staticmethod
-	def get_binary_units() -> list[Unit]:
-		return [u for u in Unit if 'i' in u.name or u.name == 'B']
+	@classmethod
+	def get_binary_units(cls) -> list[Self]:
+		return [u for u in cls if 'i' in u.name or u.name == 'B']
 
 
 class _SectorSizeSerialization(TypedDict):
@@ -281,9 +312,9 @@ class SectorSize:
 			case Unit.sectors:
 				raise ValueError('Unit type sector not allowed for SectorSize')
 
-	@staticmethod
-	def default() -> SectorSize:
-		return SectorSize(512, Unit.B)
+	@classmethod
+	def default(cls) -> Self:
+		return cls(512, Unit.B)
 
 	def json(self) -> _SectorSizeSerialization:
 		return {
@@ -292,8 +323,8 @@ class SectorSize:
 		}
 
 	@classmethod
-	def parse_args(cls, arg: _SectorSizeSerialization) -> SectorSize:
-		return SectorSize(
+	def parse_args(cls, arg: _SectorSizeSerialization) -> Self:
+		return cls(
 			arg['value'],
 			Unit[arg['unit']],
 		)
@@ -317,10 +348,6 @@ class Size:
 	unit: Unit
 	sector_size: SectorSize
 
-	def __post_init__(self) -> None:
-		if not isinstance(self.sector_size, SectorSize):
-			raise ValueError('sector size must be of type SectorSize')
-
 	def json(self) -> _SizeSerialization:
 		return {
 			'value': self.value,
@@ -329,10 +356,10 @@ class Size:
 		}
 
 	@classmethod
-	def parse_args(cls, size_arg: _SizeSerialization) -> Size:
+	def parse_args(cls, size_arg: _SizeSerialization) -> Self:
 		sector_size = size_arg['sector_size']
 
-		return Size(
+		return cls(
 			size_arg['value'],
 			Unit[size_arg['unit']],
 			SectorSize.parse_args(sector_size),
@@ -440,20 +467,20 @@ class Size:
 			return self.value * self.sector_size.normalize()
 		return int(self.value * self.unit.value)
 
-	def __sub__(self, other: Size) -> Size:
+	def __sub__(self, other: Self) -> Size:
 		src_norm = self._normalize()
 		dest_norm = other._normalize()
 		return Size(abs(src_norm - dest_norm), Unit.B, self.sector_size)
 
-	def __add__(self, other: Size) -> Size:
+	def __add__(self, other: Self) -> Size:
 		src_norm = self._normalize()
 		dest_norm = other._normalize()
 		return Size(abs(src_norm + dest_norm), Unit.B, self.sector_size)
 
-	def __lt__(self, other: Size) -> bool:
+	def __lt__(self, other: Self) -> bool:
 		return self._normalize() < other._normalize()
 
-	def __le__(self, other: Size) -> bool:
+	def __le__(self, other: Self) -> bool:
 		return self._normalize() <= other._normalize()
 
 	@override
@@ -470,10 +497,10 @@ class Size:
 
 		return self._normalize() != other._normalize()
 
-	def __gt__(self, other: Size) -> bool:
+	def __gt__(self, other: Self) -> bool:
 		return self._normalize() > other._normalize()
 
-	def __ge__(self, other: Size) -> bool:
+	def __ge__(self, other: Self) -> bool:
 		return self._normalize() >= other._normalize()
 
 
@@ -521,7 +548,7 @@ class _PartitionInfo:
 			'Start': self.start.format_size(Unit.sectors, self.sector_size, include_unit=False),
 			'End': end.format_size(Unit.sectors, self.sector_size, include_unit=False),
 			'Size': self.length.format_highest(),
-			'Flags': ', '.join([f.description for f in self.flags]),
+			'Flags': ', '.join(f.description for f in self.flags),
 		}
 
 		if self.btrfs_subvol_infos:
@@ -535,8 +562,8 @@ class _PartitionInfo:
 		partition: Partition,
 		lsblk_info: LsblkInfo,
 		fs_type: FilesystemType | None,
-		btrfs_subvol_infos: list[_BtrfsSubvolumeInfo] = [],
-	) -> _PartitionInfo:
+		btrfs_subvol_infos: list[_BtrfsSubvolumeInfo] | None = None,
+	) -> Self:
 		partition_type = PartitionType.get_type_from_code(partition.type)
 		flags = [f for f in PartitionFlag if partition.getFlag(f.flag_id)]
 
@@ -547,12 +574,15 @@ class _PartitionInfo:
 		)
 
 		length = Size(
-			int(partition.getLength(unit='B')),
+			partition.getLength(unit='B'),
 			Unit.B,
 			SectorSize(partition.disk.device.sectorSize, Unit.B),
 		)
 
-		return _PartitionInfo(
+		if btrfs_subvol_infos is None:
+			btrfs_subvol_infos = []
+
+		return cls(
 			partition=partition,
 			name=partition.get_name(),
 			type=partition_type,
@@ -581,8 +611,12 @@ class _DeviceInfo:
 	read_only: bool
 	dirty: bool
 
+	@override
+	def __hash__(self) -> int:
+		return hash(self.path)
+
 	def table_data(self) -> dict[str, str | int | bool]:
-		total_free_space = sum([region.get_length(unit=Unit.MiB) for region in self.free_space_regions])
+		total_free_space = sum(region.get_length(unit=Unit.MiB) for region in self.free_space_regions)
 		return {
 			'Model': self.model,
 			'Path': str(self.path),
@@ -594,7 +628,7 @@ class _DeviceInfo:
 		}
 
 	@classmethod
-	def from_disk(cls, disk: Disk) -> _DeviceInfo:
+	def from_disk(cls, disk: Disk) -> Self:
 		device = disk.device
 		if device.type == 18:
 			device_type = 'loop'
@@ -607,12 +641,12 @@ class _DeviceInfo:
 		sector_size = SectorSize(device.sectorSize, Unit.B)
 		free_space = [DeviceGeometry(g, sector_size) for g in disk.getFreeSpaceRegions()]
 
-		return _DeviceInfo(
+		return cls(
 			model=device.model.strip(),
 			path=Path(device.path),
 			type=device_type,
 			sector_size=sector_size,
-			total_size=Size(int(device.getLength(unit='B')), Unit.B, sector_size),
+			total_size=Size(device.getLength(unit='B'), Unit.B, sector_size),
 			free_space_regions=free_space,
 			read_only=device.readOnly,
 			dirty=device.dirty,
@@ -630,11 +664,11 @@ class SubvolumeModification:
 	mountpoint: Path | None = None
 
 	@classmethod
-	def from_existing_subvol_info(cls, info: _BtrfsSubvolumeInfo) -> SubvolumeModification:
-		return SubvolumeModification(info.name, mountpoint=info.mountpoint)
+	def from_existing_subvol_info(cls, info: _BtrfsSubvolumeInfo) -> Self:
+		return cls(info.name, mountpoint=info.mountpoint)
 
 	@classmethod
-	def parse_args(cls, subvol_args: list[_SubvolumeModificationSerialization]) -> list[SubvolumeModification]:
+	def parse_args(cls, subvol_args: list[_SubvolumeModificationSerialization]) -> list[Self]:
 		mods = []
 		for entry in subvol_args:
 			if not entry.get('name', None) or not entry.get('mountpoint', None):
@@ -643,7 +677,7 @@ class SubvolumeModification:
 
 			mountpoint = Path(entry['mountpoint']) if entry['mountpoint'] else None
 
-			mods.append(SubvolumeModification(entry['name'], mountpoint))
+			mods.append(cls(entry['name'], mountpoint))
 
 		return mods
 
@@ -662,6 +696,9 @@ class SubvolumeModification:
 		if self.mountpoint:
 			return self.mountpoint == Path('/')
 		return False
+
+	def is_default_root(self) -> bool:
+		return self.name == Path('@') and self.is_root()
 
 	def json(self) -> _SubvolumeModificationSerialization:
 		return {'name': str(self.name), 'mountpoint': str(self.mountpoint)}
@@ -714,25 +751,24 @@ class BDevice:
 		return hash(self.disk.device.path)
 
 
-class PartitionType(Enum):
-	Boot = 'boot'
-	Primary = 'primary'
-	_Unknown = 'unknown'
+class PartitionType(StrEnum):
+	BOOT = auto()
+	PRIMARY = auto()
+	_UNKNOWN = 'unknown'
 
-	@classmethod
-	def get_type_from_code(cls, code: int) -> PartitionType:
+	@staticmethod
+	def get_type_from_code(code: int) -> PartitionType:
 		if code == parted.PARTITION_NORMAL:
-			return PartitionType.Primary
+			return PartitionType.PRIMARY
 		else:
 			debug(f'Partition code not supported: {code}')
-			return PartitionType._Unknown
+			return PartitionType._UNKNOWN
 
-	def get_partition_code(self) -> int | None:
-		if self == PartitionType.Primary:
-			return parted.PARTITION_NORMAL
-		elif self == PartitionType.Boot:
+	def get_partition_code(self) -> int:
+		if self == PartitionType.BOOT:
 			return parted.PARTITION_BOOT
-		return None
+
+		return parted.PARTITION_NORMAL
 
 
 @dataclass(frozen=True)
@@ -753,7 +789,7 @@ class PartitionFlag(PartitionFlagDataMixin, Enum):
 		return self.alias or self.name.lower()
 
 	@classmethod
-	def from_string(cls, s: str) -> PartitionFlag | None:
+	def from_string(cls, s: str) -> Self | None:
 		s = s.lower()
 
 		for partition_flag in cls:
@@ -766,76 +802,63 @@ class PartitionFlag(PartitionFlagDataMixin, Enum):
 
 class PartitionGUID(Enum):
 	"""
-	A list of Partition type GUIDs (lsblk -o+PARTTYPE) can be found here: https://en.wikipedia.org/wiki/GUID_Partition_Table#Partition_type_GUIDs
+	A list of Partition type GUIDs (lsblk -o+PARTTYPE) can be found here:
+	https://en.wikipedia.org/wiki/GUID_Partition_Table#Partition_type_GUIDs
 	"""
 
+	LINUX_ROOT_AARCH64 = 'B921B045-1DF0-41C3-AF44-4C6F280D3FAE'
 	LINUX_ROOT_X86_64 = '4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709'
 
 	@property
-	def bytes(self) -> bytes:
+	def bytes(self) -> builtins.bytes:
 		return uuid.UUID(self.value).bytes
 
 
-class FilesystemType(Enum):
-	Btrfs = 'btrfs'
-	Ext2 = 'ext2'
-	Ext3 = 'ext3'
-	Ext4 = 'ext4'
-	F2fs = 'f2fs'
-	Fat12 = 'fat12'
-	Fat16 = 'fat16'
-	Fat32 = 'fat32'
-	Ntfs = 'ntfs'
-	Xfs = 'xfs'
-	LinuxSwap = 'linux-swap'
+class FilesystemType(StrEnum):
+	BTRFS = auto()
+	EXT2 = auto()
+	EXT3 = auto()
+	EXT4 = auto()
+	F2FS = auto()
+	FAT12 = auto()
+	FAT16 = auto()
+	FAT32 = auto()
+	NTFS = auto()
+	XFS = auto()
+	LINUX_SWAP = 'linux-swap'
 
 	# this is not a FS known to parted, so be careful
 	# with the usage from this enum
-	Crypto_luks = 'crypto_LUKS'
+	CRYPTO_LUKS = 'crypto_LUKS'
 
 	def is_crypto(self) -> bool:
-		return self == FilesystemType.Crypto_luks
+		return self == FilesystemType.CRYPTO_LUKS
 
-	@property
-	def fs_type_mount(self) -> str:
-		match self:
-			case FilesystemType.Ntfs:
-				return 'ntfs3'
-			case FilesystemType.Fat32:
-				return 'vfat'
-			case _:
-				return self.value
+	def is_fat(self) -> bool:
+		return self in (FilesystemType.FAT12, FilesystemType.FAT16, FilesystemType.FAT32)
 
 	@property
 	def parted_value(self) -> str:
-		return self.value + '(v1)' if self == FilesystemType.LinuxSwap else self.value
+		return self.value + '(v1)' if self == FilesystemType.LINUX_SWAP else self.value
 
 	@property
 	def installation_pkg(self) -> str | None:
 		match self:
-			case FilesystemType.Btrfs:
+			case FilesystemType.BTRFS:
 				return 'btrfs-progs'
-			case FilesystemType.Xfs:
+			case FilesystemType.XFS:
 				return 'xfsprogs'
-			case FilesystemType.F2fs:
+			case FilesystemType.F2FS:
 				return 'f2fs-tools'
 			case _:
 				return None
 
-	@property
-	def installation_hooks(self) -> str | None:
-		match self:
-			case FilesystemType.Btrfs:
-				return 'btrfs'
-			case _:
-				return None
 
-
-class ModificationStatus(Enum):
-	Exist = 'existing'
-	Modify = 'modify'
-	Delete = 'delete'
-	Create = 'create'
+class ModificationStatus(StrEnum):
+	EXIST = 'existing'
+	MODIFY = auto()
+	DELETE = auto()
+	CREATE = auto()
 
 
 class _PartitionModificationSerialization(TypedDict):
@@ -880,7 +903,7 @@ class PartitionModification:
 		if self.is_exists_or_modify() and not self.dev_path:
 			raise ValueError('If partition marked as existing a path must be set')
 
-		if self.fs_type is None and self.status == ModificationStatus.Modify:
+		if self.fs_type is None and self.status == ModificationStatus.MODIFY:
 			raise ValueError('FS type must not be empty on modifications with status type modify')
 
 	@override
@@ -910,7 +933,7 @@ class PartitionModification:
 		return self.fs_type
 
 	@classmethod
-	def from_existing_partition(cls, partition_info: _PartitionInfo) -> PartitionModification:
+	def from_existing_partition(cls, partition_info: _PartitionInfo) -> Self:
 		if partition_info.btrfs_subvol_infos:
 			mountpoint = None
 			subvol_mods = []
@@ -922,8 +945,8 @@ class PartitionModification:
 			mountpoint = partition_info.mountpoints[0] if partition_info.mountpoints else None
 			subvol_mods = []
 
-		return PartitionModification(
-			status=ModificationStatus.Exist,
+		return cls(
+			status=ModificationStatus.EXIST,
 			type=partition_info.type,
 			start=partition_info.start,
 			length=partition_info.length,
@@ -970,26 +993,26 @@ class PartitionModification:
 		return False
 
 	def is_swap(self) -> bool:
-		return self.fs_type == FilesystemType.LinuxSwap
+		return self.fs_type == FilesystemType.LINUX_SWAP
 
 	def is_modify(self) -> bool:
-		return self.status == ModificationStatus.Modify
+		return self.status == ModificationStatus.MODIFY
 
 	def is_delete(self) -> bool:
-		return self.status == ModificationStatus.Delete
+		return self.status == ModificationStatus.DELETE
 
 	def exists(self) -> bool:
-		return self.status == ModificationStatus.Exist
+		return self.status == ModificationStatus.EXIST
 
 	def is_exists_or_modify(self) -> bool:
 		return self.status in [
-			ModificationStatus.Exist,
-			ModificationStatus.Delete,
-			ModificationStatus.Modify,
+			ModificationStatus.EXIST,
+			ModificationStatus.DELETE,
+			ModificationStatus.MODIFY,
 		]
 
 	def is_create_or_modify(self) -> bool:
-		return self.status in [ModificationStatus.Create, ModificationStatus.Modify]
+		return self.status in [ModificationStatus.CREATE, ModificationStatus.MODIFY]
 
 	@property
 	def mapper_name(self) -> str | None:
@@ -1043,7 +1066,7 @@ class PartitionModification:
 			'FS type': self.fs_type.value if self.fs_type else 'Unknown',
 			'Mountpoint': str(self.mountpoint) if self.mountpoint else '',
 			'Mount options': ', '.join(self.mount_options),
-			'Flags': ', '.join([f.description for f in self.flags]),
+			'Flags': ', '.join(f.description for f in self.flags),
 		}
 
 		if self.btrfs_subvols:
@@ -1061,10 +1084,6 @@ class LvmLayoutType(Enum):
 		match self:
 			case LvmLayoutType.Default:
 				return tr('Default layout')
-			# case LvmLayoutType.Manual:
-			# 	return str(_('Manual configuration'))
-
-		raise ValueError(f'Unknown type: {self}')
 
 
 class _LvmVolumeGroupSerialization(TypedDict):
@@ -1086,15 +1105,15 @@ class LvmVolumeGroup:
 			'volumes': [vol.json() for vol in self.volumes],
 		}
 
-	@staticmethod
-	def parse_arg(arg: _LvmVolumeGroupSerialization, disk_config: DiskLayoutConfiguration) -> LvmVolumeGroup:
+	@classmethod
+	def parse_arg(cls, arg: _LvmVolumeGroupSerialization, disk_config: DiskLayoutConfiguration) -> Self:
 		lvm_pvs = []
 		for mod in disk_config.device_modifications:
 			for part in mod.partitions:
 				if part.obj_id in arg.get('lvm_pvs', []):
 					lvm_pvs.append(part)
 
-		return LvmVolumeGroup(
+		return cls(
 			arg['name'],
 			lvm_pvs,
 			[LvmVolume.parse_arg(vol) for vol in arg['volumes']],
@@ -1102,13 +1121,6 @@ class LvmVolumeGroup:
 
 	def contains_lv(self, lv: LvmVolume) -> bool:
 		return lv in self.volumes
-
-
-class LvmVolumeStatus(Enum):
-	Exist = 'existing'
-	Modify = 'modify'
-	Delete = 'delete'
-	Create = 'create'
 
 
 class _LvmVolumeSerialization(TypedDict):
@@ -1124,7 +1136,7 @@ class _LvmVolumeSerialization(TypedDict):
 
 @dataclass
 class LvmVolume:
-	status: LvmVolumeStatus
+	status: ModificationStatus
 	name: str
 	fs_type: FilesystemType
 	length: Size
@@ -1190,10 +1202,10 @@ class LvmVolume:
 
 		raise ValueError('Mountpoint is not specified')
 
-	@staticmethod
-	def parse_arg(arg: _LvmVolumeSerialization) -> LvmVolume:
-		volume = LvmVolume(
-			status=LvmVolumeStatus(arg['status']),
+	@classmethod
+	def parse_arg(cls, arg: _LvmVolumeSerialization) -> Self:
+		volume = cls(
+			status=ModificationStatus(arg['status']),
 			name=arg['name'],
 			fs_type=FilesystemType(arg['fs_type']),
 			length=Size.parse_args(arg['length']),
@@ -1231,13 +1243,13 @@ class LvmVolume:
 		return part_mod
 
 	def is_modify(self) -> bool:
-		return self.status == LvmVolumeStatus.Modify
+		return self.status == ModificationStatus.MODIFY
 
 	def exists(self) -> bool:
-		return self.status == LvmVolumeStatus.Exist
+		return self.status == ModificationStatus.EXIST
 
 	def is_exists_or_modify(self) -> bool:
-		return self.status in [LvmVolumeStatus.Exist, LvmVolumeStatus.Modify]
+		return self.status in [ModificationStatus.EXIST, ModificationStatus.MODIFY]
 
 	def is_root(self) -> bool:
 		if self.mountpoint is not None:
@@ -1295,8 +1307,8 @@ class LvmConfiguration:
 			'vol_groups': [vol_gr.json() for vol_gr in self.vol_groups],
 		}
 
-	@staticmethod
-	def parse_arg(arg: _LvmConfigurationSerialization, disk_config: DiskLayoutConfiguration) -> LvmConfiguration:
+	@classmethod
+	def parse_arg(cls, arg: _LvmConfigurationSerialization, disk_config: DiskLayoutConfiguration) -> Self:
 		lvm_pvs = []
 		for mod in disk_config.device_modifications:
 			for part in mod.partitions:
@@ -1304,7 +1316,7 @@ class LvmConfiguration:
 				if part.obj_id in arg.get('lvm_pvs', []):  # type: ignore[operator]
 					lvm_pvs.append(part)
 
-		return LvmConfiguration(
+		return cls(
 			config_type=LvmLayoutType(arg['config_type']),
 			vol_groups=[LvmVolumeGroup.parse_arg(vol_group, disk_config) for vol_group in arg['vol_groups']],
 		)
@@ -1341,7 +1353,7 @@ class _SnapshotConfigSerialization(TypedDict):
 	type: str
 
 
-class SnapshotType(Enum):
+class SnapshotType(StrEnum):
 	Snapper = 'Snapper'
 	Timeshift = 'Timeshift'
 
@@ -1353,9 +1365,9 @@ class SnapshotConfig:
 	def json(self) -> _SnapshotConfigSerialization:
 		return {'type': self.snapshot_type.value}
 
-	@staticmethod
-	def parse_args(args: _SnapshotConfigSerialization) -> SnapshotConfig:
-		return SnapshotConfig(SnapshotType(args['type']))
+	@classmethod
+	def parse_args(cls, args: _SnapshotConfigSerialization) -> Self:
+		return cls(SnapshotType(args['type']))
 
 
 @dataclass
@@ -1365,12 +1377,12 @@ class BtrfsOptions:
 	def json(self) -> _BtrfsOptionsSerialization:
 		return {'snapshot_config': self.snapshot_config.json() if self.snapshot_config else None}
 
-	@staticmethod
-	def parse_arg(arg: _BtrfsOptionsSerialization) -> BtrfsOptions | None:
+	@classmethod
+	def parse_arg(cls, arg: _BtrfsOptionsSerialization) -> Self | None:
 		snapshot_args = arg.get('snapshot_config')
 		if snapshot_args:
 			snapshot_config = SnapshotConfig.parse_args(snapshot_args)
-			return BtrfsOptions(snapshot_config)
+			return cls(snapshot_config)
 
 		return None
 
@@ -1423,31 +1435,30 @@ class DeviceModification:
 		}
 
 
-class EncryptionType(Enum):
-	NoEncryption = 'no_encryption'
-	Luks = 'luks'
-	LvmOnLuks = 'lvm_on_luks'
-	LuksOnLvm = 'luks_on_lvm'
+class EncryptionType(StrEnum):
+	NO_ENCRYPTION = auto()
+	LUKS = auto()
+	LVM_ON_LUKS = auto()
+	LUKS_ON_LVM = auto()
 
 	@classmethod
-	def _encryption_type_mapper(cls) -> dict[str, 'EncryptionType']:
+	def _encryption_type_mapper(cls) -> dict[str, Self]:
 		return {
-			tr('No Encryption'): EncryptionType.NoEncryption,
-			tr('LUKS'): EncryptionType.Luks,
-			tr('LVM on LUKS'): EncryptionType.LvmOnLuks,
-			tr('LUKS on LVM'): EncryptionType.LuksOnLvm,
+			tr('No Encryption'): cls.NO_ENCRYPTION,
+			tr('LUKS'): cls.LUKS,
+			tr('LVM on LUKS'): cls.LVM_ON_LUKS,
+			tr('LUKS on LVM'): cls.LUKS_ON_LVM,
 		}
 
 	@classmethod
-	def text_to_type(cls, text: str) -> 'EncryptionType':
+	def text_to_type(cls, text: str) -> Self:
 		mapping = cls._encryption_type_mapper()
 		return mapping[text]
 
-	@classmethod
-	def type_to_text(cls, type_: 'EncryptionType') -> str:
-		mapping = cls._encryption_type_mapper()
-		type_to_text = {type_: text for text, type_ in mapping.items()}
-		return type_to_text[type_]
+	def type_to_text(self) -> str:
+		mapping = self._encryption_type_mapper()
+		type_to_text = {enctype: text for text, enctype in mapping.items()}
+		return type_to_text[self]
 
 
 class _DiskEncryptionSerialization(TypedDict):
@@ -1460,7 +1471,7 @@ class _DiskEncryptionSerialization(TypedDict):
 
 @dataclass
 class DiskEncryption:
-	encryption_type: EncryptionType = EncryptionType.NoEncryption
+	encryption_type: EncryptionType = EncryptionType.NO_ENCRYPTION
 	encryption_password: Password | None = None
 	partitions: list[PartitionModification] = field(default_factory=list)
 	lvm_volumes: list[LvmVolume] = field(default_factory=list)
@@ -1468,10 +1479,10 @@ class DiskEncryption:
 	iter_time: int = DEFAULT_ITER_TIME
 
 	def __post_init__(self) -> None:
-		if self.encryption_type in [EncryptionType.Luks, EncryptionType.LvmOnLuks] and not self.partitions:
+		if self.encryption_type in [EncryptionType.LUKS, EncryptionType.LVM_ON_LUKS] and not self.partitions:
 			raise ValueError('Luks or LvmOnLuks encryption require partitions to be defined')
 
-		if self.encryption_type == EncryptionType.LuksOnLvm and not self.lvm_volumes:
+		if self.encryption_type == EncryptionType.LUKS_ON_LVM and not self.lvm_volumes:
 			raise ValueError('LuksOnLvm encryption require LMV volumes to be defined')
 
 	def should_generate_encryption_file(self, dev: PartitionModification | LvmVolume) -> bool:
@@ -1495,9 +1506,8 @@ class DiskEncryption:
 
 		return obj
 
-	@classmethod
+	@staticmethod
 	def validate_enc(
-		cls,
 		modifications: list[DeviceModification],
 		lvm_config: LvmConfiguration | None = None,
 	) -> bool:
@@ -1519,7 +1529,7 @@ class DiskEncryption:
 		disk_config: DiskLayoutConfiguration,
 		disk_encryption: _DiskEncryptionSerialization,
 		password: Password | None = None,
-	) -> 'DiskEncryption | None':
+	) -> Self | None:
 		if not cls.validate_enc(disk_config.device_modifications, disk_config.lvm_config):
 			return None
 
@@ -1538,7 +1548,7 @@ class DiskEncryption:
 				if vol.obj_id in disk_encryption.get('lvm_volumes', []):
 					volumes.append(vol)
 
-		enc = DiskEncryption(
+		enc = cls(
 			EncryptionType(disk_encryption['encryption_type']),
 			password,
 			enc_partitions,
@@ -1581,8 +1591,8 @@ class Fido2Device:
 		}
 
 	@classmethod
-	def parse_arg(cls, arg: _Fido2DeviceSerialization) -> 'Fido2Device':
-		return Fido2Device(
+	def parse_arg(cls, arg: _Fido2DeviceSerialization) -> Self:
+		return cls(
 			Path(arg['path']),
 			arg['manufacturer'],
 			arg['product'],
@@ -1607,7 +1617,7 @@ class LsblkInfo(BaseModel):
 	fsver: str | None
 	fsavail: int | None
 	fsuse_percentage: str | None = Field(alias='fsuse%')
-	type: str | None  # may be None for strange behavior with md devices
+	type: str
 	mountpoint: Path | None
 	mountpoints: list[Path]
 	fsroots: list[Path]
@@ -1615,14 +1625,18 @@ class LsblkInfo(BaseModel):
 
 	@field_validator('size', mode='before')
 	@classmethod
-	def convert_size(cls, v: int, info: ValidationInfo) -> Size:
-		sector_size = SectorSize(info.data['log_sec'], Unit.B)
-		return Size(v, Unit.B, sector_size)
+	def convert_size(cls, value: Any, info: ValidationInfo) -> Any:
+		if isinstance(value, int):
+			sector_size = SectorSize(info.data['log_sec'], Unit.B)
+			return Size(value, Unit.B, sector_size)
+		return value
 
 	@field_validator('mountpoints', 'fsroots', mode='before')
 	@classmethod
-	def remove_none(cls, v: list[Path | None]) -> list[Path]:
-		return [item for item in v if item is not None]
+	def remove_none(cls, value: Any) -> Any:
+		if isinstance(value, list):
+			return [item for item in value if item is not None]
+		return value
 
 	@field_serializer('size', when_used='json')
 	def serialize_size(self, size: Size) -> str:

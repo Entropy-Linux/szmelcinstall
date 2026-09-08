@@ -18,13 +18,13 @@ jobs:
       image: archlinux/archlinux:latest
       options: --privileged
     steps:
-      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Prepare arch
         run: |
           pacman-key --init
           pacman --noconfirm -Sy archlinux-keyring
           pacman --noconfirm -Syyu
-          pacman --noconfirm -Sy python python-uv python-setuptools python-pip python-pyparted python-pydantic
+          pacman --noconfirm -Sy python python-uv python-setuptools python-pip python-pyparted python-pydantic python-textual
       - name: Build archinstall
         run: |
           uv build --no-build-isolation --wheel

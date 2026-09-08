@@ -1,33 +1,46 @@
 import argparse
 import json
 import os
+import stat
+import sys
+import tempfile
 import urllib.error
 import urllib.parse
 from argparse import ArgumentParser, Namespace
 from dataclasses import dataclass, field
-from importlib.metadata import version
+from enum import Enum, StrEnum, auto
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 from urllib.request import Request, urlopen
 
+from pydantic import TypeAdapter
 from pydantic.dataclasses import dataclass as p_dataclass
 
-from archinstall.lib.crypt import decrypt
-from archinstall.lib.models.application import ApplicationConfiguration
+from archinstall.lib.crypt import decrypt, encrypt
+from archinstall.lib.log import debug, error, logger, warn
+from archinstall.lib.menu.util import get_password
+from archinstall.lib.models.application import ApplicationConfiguration, ZramConfiguration
 from archinstall.lib.models.authentication import AuthenticationConfiguration
 from archinstall.lib.models.bootloader import Bootloader, BootloaderConfiguration
+from archinstall.lib.models.config import SubConfig
 from archinstall.lib.models.device import DiskEncryption, DiskLayoutConfiguration
 from archinstall.lib.models.locale import LocaleConfiguration
 from archinstall.lib.models.mirrors import MirrorConfiguration
 from archinstall.lib.models.network import NetworkConfiguration
+from archinstall.lib.models.package_types import DEFAULT_KERNEL
 from archinstall.lib.models.packages import Repository
+from archinstall.lib.models.pacman import PacmanConfiguration
 from archinstall.lib.models.profile import ProfileConfiguration
 from archinstall.lib.models.users import Password, User, UserSerialization
-from archinstall.lib.output import debug, error, logger, warn
 from archinstall.lib.plugins import load_plugin
 from archinstall.lib.translationhandler import Language, tr, translation_handler
-from archinstall.lib.utils.util import get_password
-from archinstall.tui.curses_menu import Tui
+from archinstall.lib.utils.format import as_key_value_pair
+from archinstall.lib.version import get_version
+from archinstall.tui.components import tui
+
+
+class SubCommand(Enum):
+	SHARE_LOG = 'share-log'
 
 
 @p_dataclass
@@ -47,11 +60,125 @@ class Arguments:
 	debug: bool = False
 	offline: bool = False
 	no_pkg_lookups: bool = False
-	plugin: str | None = None
+	plugin: Path | None = None
+	plugin_url: str | None = None
 	skip_version_check: bool = False
 	skip_wifi_check: bool = False
 	advanced: bool = False
 	verbose: bool = False
+
+	command: SubCommand | None = None
+
+
+class ArchConfigType(StrEnum):
+	VERSION = auto()
+	SCRIPT = auto()
+	LOCALE_CONFIG = auto()
+	ARCHINSTALL_LANGUAGE = auto()
+	DISK_CONFIG = auto()
+	PROFILE_CONFIG = auto()
+	MIRROR_CONFIG = auto()
+	NETWORK_CONFIG = auto()
+	BOOTLOADER_CONFIG = auto()
+	APP_CONFIG = auto()
+	AUTH_CONFIG = auto()
+	SWAP = auto()
+	USERS = auto()
+	ROOT_ENC_PASSWORD = auto()
+	ENCRYPTION_PASSWORD = auto()
+	HOSTNAME = auto()
+	KERNELS = auto()
+	NTP = auto()
+	TIMEZONE = auto()
+	SERVICES = auto()
+	PACKAGES = auto()
+	PACMAN_CONFIG = auto()
+	CUSTOM_COMMANDS = auto()
+	# szmelcinstall / Entropy Linux additions
+	INSTALL_FROM_ISO = auto()
+	INSTALL_FROM_ISO_MODE = auto()
+	CUSTOM_SCRIPT = auto()
+	SZMELC_AUR = auto()
+	INSTALL_YAY = auto()
+	CHAOTIC_AUR = auto()
+	ENTROPY_KITS = auto()
+	ENTROPY_CONFIG_PACKS = auto()
+	ENTROPY_ASSET_PACKS = auto()
+	ENTROPY_SZMELC_PACKAGES = auto()
+
+	def text(self) -> str:
+		match self:
+			case ArchConfigType.ARCHINSTALL_LANGUAGE:
+				return tr('ArchInstall Language')
+			case ArchConfigType.VERSION:
+				return tr('Version')
+			case ArchConfigType.SCRIPT:
+				return tr('Installation Script')
+			case ArchConfigType.LOCALE_CONFIG:
+				return tr('Locales')
+			case ArchConfigType.DISK_CONFIG:
+				return tr('Disk configuration')
+			case ArchConfigType.PROFILE_CONFIG:
+				return tr('Profile')
+			case ArchConfigType.MIRROR_CONFIG:
+				return tr('Mirrors and repositories')
+			case ArchConfigType.NETWORK_CONFIG:
+				return tr('Network')
+			case ArchConfigType.BOOTLOADER_CONFIG:
+				return tr('Bootloader')
+			case ArchConfigType.APP_CONFIG:
+				return tr('Application')
+			case ArchConfigType.AUTH_CONFIG:
+				return tr('Authentication')
+			case ArchConfigType.SWAP:
+				return tr('Swap')
+			case ArchConfigType.HOSTNAME:
+				return tr('Hostname')
+			case ArchConfigType.KERNELS:
+				return tr('Kernels')
+			case ArchConfigType.NTP:
+				return tr('Automatic time sync (NTP)')
+			case ArchConfigType.TIMEZONE:
+				return tr('Timezone')
+			case ArchConfigType.SERVICES:
+				return tr('Services')
+			case ArchConfigType.PACKAGES:
+				return tr('Additional packages')
+			case ArchConfigType.PACMAN_CONFIG:
+				return tr('Pacman')
+			case ArchConfigType.CUSTOM_COMMANDS:
+				return tr('Custom commands')
+			case ArchConfigType.USERS:
+				return tr('Users')
+			case ArchConfigType.ROOT_ENC_PASSWORD:
+				return tr('Root encrypted password')
+			case ArchConfigType.ENCRYPTION_PASSWORD:
+				return tr('Disk encryption password')
+			case ArchConfigType.INSTALL_FROM_ISO:
+				return tr('Install from ISO')
+			case ArchConfigType.INSTALL_FROM_ISO_MODE:
+				return tr('Install from ISO mode')
+			case ArchConfigType.CUSTOM_SCRIPT:
+				return tr('Custom script (custom.sh)')
+			case ArchConfigType.SZMELC_AUR:
+				return tr('Szmelc AUR')
+			case ArchConfigType.INSTALL_YAY:
+				return tr('Install yay')
+			case ArchConfigType.CHAOTIC_AUR:
+				return tr('Chaotic AUR')
+			case ArchConfigType.ENTROPY_KITS:
+				return tr('Entropy kits')
+			case ArchConfigType.ENTROPY_CONFIG_PACKS:
+				return tr('Szmelc configs')
+			case ArchConfigType.ENTROPY_ASSET_PACKS:
+				return tr('Szmelc assets')
+			case ArchConfigType.ENTROPY_SZMELC_PACKAGES:
+				return tr('Szmelc packages')
+
+
+USER_CONFIG_FILE: Path = Path('user_configuration.json')
+USER_CREDS_FILE: Path = Path('user_credentials.json')
+DEFAULT_SAVE_PATH = logger.directory
 
 
 @dataclass
@@ -62,99 +189,161 @@ class ArchConfig:
 	archinstall_language: Language = field(default_factory=lambda: translation_handler.get_language_by_abbr('en'))
 	disk_config: DiskLayoutConfiguration | None = None
 	profile_config: ProfileConfiguration | None = None
-	mirror_config: MirrorConfiguration | None = field(default_factory=MirrorConfiguration)
+	mirror_config: MirrorConfiguration | None = None
 	network_config: NetworkConfiguration | None = None
 	bootloader_config: BootloaderConfiguration | None = None
 	app_config: ApplicationConfiguration | None = None
 	auth_config: AuthenticationConfiguration | None = None
+	swap: ZramConfiguration | None = None
 	hostname: str = 'entropy'
-	kernels: list[str] = field(default_factory=lambda: ['linux'])
+	kernels: list[str] = field(default_factory=lambda: [DEFAULT_KERNEL.value])
 	ntp: bool = True
 	packages: list[str] = field(default_factory=list)
-	parallel_downloads: int = 0
-	swap: bool = True
+	pacman_config: PacmanConfiguration = field(default_factory=PacmanConfiguration)
 	timezone: str = 'UTC'
 	services: list[str] = field(default_factory=list)
 	custom_commands: list[str] = field(default_factory=list)
+	# szmelcinstall / Entropy Linux additions
 	install_from_iso: bool = False
 	install_from_iso_mode: str = 'configs'
 	custom_script: bool = False
 	szmelc_aur: bool = True
 	install_yay: bool = True
 	chaotic_aur: bool = True
-	entropy_tweaks: bool | None = None
-	arch_tweaks: bool | None = None
 	entropy_kits: list[str] = field(default_factory=list)
 	entropy_config_packs: list[str] = field(default_factory=list)
 	entropy_asset_packs: list[str] = field(default_factory=list)
 	entropy_szmelc_packages: list[str] = field(default_factory=list)
+	# Navigation placeholders for the Entropy/Arch tweak submenus. They hold no
+	# configuration of their own, but AbstractMenu._sync_from_config() looks up
+	# every keyed MenuItem on the config, so the attributes have to exist.
+	entropy_tweaks: bool | None = None
+	arch_tweaks: bool | None = None
 
-	def unsafe_json(self) -> dict[str, Any]:
-		config: dict[str, list[UserSerialization] | str | None] = {}
+	def unsafe_config(self) -> dict[ArchConfigType, Any]:
+		config: dict[ArchConfigType, list[UserSerialization] | str | None] = {}
 
 		if self.auth_config:
 			if self.auth_config.users:
-				config['users'] = [user.json() for user in self.auth_config.users]
+				config[ArchConfigType.USERS] = [user.json() for user in self.auth_config.users]
 
 			if self.auth_config.root_enc_password:
-				config['root_enc_password'] = self.auth_config.root_enc_password.enc_password
+				config[ArchConfigType.ROOT_ENC_PASSWORD] = self.auth_config.root_enc_password.enc_password
 
 		if self.disk_config:
 			disk_encryption = self.disk_config.disk_encryption
 			if disk_encryption and disk_encryption.encryption_password:
-				config['encryption_password'] = disk_encryption.encryption_password.plaintext
+				config[ArchConfigType.ENCRYPTION_PASSWORD] = disk_encryption.encryption_password.plaintext
 
 		return config
 
-	def safe_json(self) -> dict[str, Any]:
-		config: Any = {
-			'version': self.version,
-			'script': self.script,
-			'archinstall-language': self.archinstall_language.json(),
-			'hostname': self.hostname,
-			'kernels': self.kernels,
-			'ntp': self.ntp,
-			'packages': self.packages,
-			'parallel_downloads': self.parallel_downloads,
-			'swap': self.swap,
-			'timezone': self.timezone,
-			'services': self.services,
-			'custom_commands': self.custom_commands,
-			'install_from_iso': self.install_from_iso,
-			'install_from_iso_mode': self.install_from_iso_mode,
-			'custom_script': self.custom_script,
-			'szmelc_aur': self.szmelc_aur,
-			'install_yay': self.install_yay,
-			'chaotic_aur': self.chaotic_aur,
-			'bootloader_config': self.bootloader_config.json() if self.bootloader_config else None,
-			'app_config': self.app_config.json() if self.app_config else None,
-			'auth_config': self.auth_config.json() if self.auth_config else None,
-			'entropy_kits': self.entropy_kits,
-			'entropy_config_packs': self.entropy_config_packs,
-			'entropy_asset_packs': self.entropy_asset_packs,
-			'entropy_szmelc_packages': self.entropy_szmelc_packages,
+	def safe_config(self) -> dict[ArchConfigType, Any]:
+		base_config: dict[ArchConfigType, Any] = {
+			ArchConfigType.VERSION: self.version,
+			ArchConfigType.SCRIPT: self.script,
+			ArchConfigType.ARCHINSTALL_LANGUAGE: self.archinstall_language.json(),
 		}
 
-		if self.locale_config:
-			config['locale_config'] = self.locale_config.json()
+		base_config.update(self.plain_cfg())
+		sub_config = self.sub_cfg()
 
-		if self.disk_config:
-			config['disk_config'] = self.disk_config.json()
+		for config_type, value in sub_config.items():
+			if not hasattr(value, 'json'):
+				raise ValueError(f'Config value for {config_type} must implement json() method')
+			base_config[config_type] = value.json()
 
-		if self.profile_config:
-			config['profile_config'] = self.profile_config.json()
+		return base_config
+
+	def plain_cfg(self) -> dict[ArchConfigType, str | list[str] | bool]:
+		return {
+			ArchConfigType.HOSTNAME: self.hostname,
+			ArchConfigType.KERNELS: self.kernels,
+			ArchConfigType.NTP: self.ntp,
+			ArchConfigType.TIMEZONE: self.timezone,
+			ArchConfigType.SERVICES: self.services,
+			ArchConfigType.PACKAGES: self.packages,
+			ArchConfigType.CUSTOM_COMMANDS: self.custom_commands,
+			ArchConfigType.INSTALL_FROM_ISO: self.install_from_iso,
+			ArchConfigType.INSTALL_FROM_ISO_MODE: self.install_from_iso_mode,
+			ArchConfigType.CUSTOM_SCRIPT: self.custom_script,
+			ArchConfigType.SZMELC_AUR: self.szmelc_aur,
+			ArchConfigType.INSTALL_YAY: self.install_yay,
+			ArchConfigType.CHAOTIC_AUR: self.chaotic_aur,
+			ArchConfigType.ENTROPY_KITS: self.entropy_kits,
+			ArchConfigType.ENTROPY_CONFIG_PACKS: self.entropy_config_packs,
+			ArchConfigType.ENTROPY_ASSET_PACKS: self.entropy_asset_packs,
+			ArchConfigType.ENTROPY_SZMELC_PACKAGES: self.entropy_szmelc_packages,
+		}
+
+	def sub_cfg(self) -> dict[ArchConfigType, SubConfig]:
+		cfg: dict[ArchConfigType, SubConfig] = {
+			ArchConfigType.PACMAN_CONFIG: self.pacman_config,
+		}
 
 		if self.mirror_config:
-			config['mirror_config'] = self.mirror_config.json()
+			cfg[ArchConfigType.MIRROR_CONFIG] = self.mirror_config
+
+		if self.bootloader_config:
+			cfg[ArchConfigType.BOOTLOADER_CONFIG] = self.bootloader_config
+
+		if self.disk_config:
+			cfg[ArchConfigType.DISK_CONFIG] = self.disk_config
+
+		if self.swap:
+			cfg[ArchConfigType.SWAP] = self.swap
+
+		if self.auth_config:
+			cfg[ArchConfigType.AUTH_CONFIG] = self.auth_config
+
+		if self.locale_config:
+			cfg[ArchConfigType.LOCALE_CONFIG] = self.locale_config
+
+		if self.profile_config:
+			cfg[ArchConfigType.PROFILE_CONFIG] = self.profile_config
 
 		if self.network_config:
-			config['network_config'] = self.network_config.json()
+			cfg[ArchConfigType.NETWORK_CONFIG] = self.network_config
 
-		return config
+		if self.app_config:
+			cfg[ArchConfigType.APP_CONFIG] = self.app_config
+
+		return cfg
+
+	def _parse_szmelc_args(self, args_config: dict[str, Any]) -> None:
+		"""Parse the szmelcinstall / Entropy Linux specific configuration keys."""
+		if 'install_from_iso' in args_config:
+			self.install_from_iso = bool(args_config['install_from_iso'])
+
+		if 'install_from_iso_mode' in args_config:
+			self.install_from_iso_mode = str(args_config['install_from_iso_mode'])
+
+		if 'custom_script' in args_config:
+			self.custom_script = bool(args_config['custom_script'])
+
+		if 'szmelc_aur' in args_config:
+			self.szmelc_aur = bool(args_config['szmelc_aur'])
+
+		if 'install_yay' in args_config:
+			self.install_yay = bool(args_config['install_yay'])
+
+		if 'chaotic_aur' in args_config:
+			self.chaotic_aur = bool(args_config['chaotic_aur'])
+
+		if 'entropy_kits' in args_config:
+			self.entropy_kits = list(args_config['entropy_kits'])
+
+		if 'entropy_config_packs' in args_config:
+			self.entropy_config_packs = list(args_config['entropy_config_packs'])
+
+		if 'entropy_asset_packs' in args_config:
+			self.entropy_asset_packs = list(args_config['entropy_asset_packs'])
+
+		if 'entropy_szmelc_packages' in args_config:
+			self.entropy_szmelc_packages = list(args_config['entropy_szmelc_packages'])
 
 	@classmethod
-	def from_config(cls, args_config: dict[str, Any], args: Arguments) -> 'ArchConfig':
-		arch_config = ArchConfig()
+	def from_config(cls, args_config: dict[str, Any], args: Arguments) -> Self:
+		arch_config = cls()
 
 		arch_config.locale_config = LocaleConfiguration.parse_arg(args_config)
 
@@ -163,6 +352,7 @@ class ArchConfig:
 
 		if archinstall_lang := args_config.get('archinstall-language', None):
 			arch_config.archinstall_language = translation_handler.get_language_by_name(archinstall_lang)
+			translation_handler.activate(arch_config.archinstall_language, set_font=False)
 
 		if disk_config := args_config.get('disk_config', {}):
 			enc_password = args_config.get('encryption_password', '')
@@ -207,7 +397,7 @@ class ArchConfig:
 			uki = args_config.get('uki', False)
 			if uki and not bootloader.has_uki_support():
 				uki = False
-			arch_config.bootloader_config = BootloaderConfiguration(bootloader=bootloader, uki=uki, removable=False)
+			arch_config.bootloader_config = BootloaderConfiguration(bootloader=bootloader, uki=uki, removable=True)
 
 		# deprecated: backwards compatibility
 		audio_config_args = args_config.get('audio_config', None)
@@ -230,50 +420,20 @@ class ArchConfig:
 		if packages := args_config.get('packages', []):
 			arch_config.packages = packages
 
-		if parallel_downloads := args_config.get('parallel_downloads', 0):
-			arch_config.parallel_downloads = parallel_downloads
+		if pacman_config := args_config.get('pacman_config', None):
+			arch_config.pacman_config = PacmanConfiguration.parse_arg(pacman_config)
+		elif parallel_downloads := args_config.get('parallel_downloads', 0):
+			arch_config.pacman_config = PacmanConfiguration(parallel_downloads=int(parallel_downloads))
 
-		arch_config.swap = args_config.get('swap', True)
+		swap_arg = args_config.get('swap')
+		if swap_arg is not None:
+			arch_config.swap = ZramConfiguration.parse_arg(swap_arg)
 
 		if timezone := args_config.get('timezone', 'UTC'):
 			arch_config.timezone = timezone
 
 		if services := args_config.get('services', []):
 			arch_config.services = services
-
-		if 'install_from_iso' in args_config:
-			arch_config.install_from_iso = bool(args_config['install_from_iso'])
-		if 'install_from_iso_mode' in args_config:
-			arch_config.install_from_iso_mode = str(args_config['install_from_iso_mode'])
-		if 'custom_script' in args_config:
-			arch_config.custom_script = bool(args_config['custom_script'])
-
-		if 'szmelc_aur' in args_config:
-			arch_config.szmelc_aur = bool(args_config['szmelc_aur'])
-
-		if 'entropy_kits' in args_config:
-			arch_config.entropy_kits = list(args_config['entropy_kits'])
-
-		if 'entropy_config_packs' in args_config:
-			arch_config.entropy_config_packs = list(args_config['entropy_config_packs'])
-
-		if 'entropy_asset_packs' in args_config:
-			arch_config.entropy_asset_packs = list(args_config['entropy_asset_packs'])
-
-		if 'entropy_szmelc_packages' in args_config:
-			arch_config.entropy_szmelc_packages = list(args_config['entropy_szmelc_packages'])
-
-		if 'install_yay' in args_config:
-			arch_config.install_yay = bool(args_config['install_yay'])
-
-		if 'chaotic_aur' in args_config:
-			arch_config.chaotic_aur = bool(args_config['chaotic_aur'])
-
-		# tweak menu state placeholders
-		if 'entropy_tweaks' in args_config:
-			arch_config.entropy_tweaks = args_config['entropy_tweaks']
-		if 'arch_tweaks' in args_config:
-			arch_config.arch_tweaks = args_config['arch_tweaks']
 
 		# DEPRECATED: backwards compatibility
 		root_password = None
@@ -288,7 +448,7 @@ class ArchConfig:
 				arch_config.auth_config = AuthenticationConfiguration()
 			arch_config.auth_config.root_enc_password = root_password
 
-		# DEPRECATED: backwards copatibility
+		# DEPRECATED: backwards compatibility
 		users: list[User] = []
 		if args_users := args_config.get('!users', None):
 			users = User.parse_arguments(args_users)
@@ -304,23 +464,113 @@ class ArchConfig:
 		if custom_commands := args_config.get('custom_commands', []):
 			arch_config.custom_commands = custom_commands
 
+		arch_config._parse_szmelc_args(args_config)
+
 		return arch_config
+
+	def user_config_to_json(self) -> str:
+		config = self.safe_config()
+
+		adapter = TypeAdapter(dict[ArchConfigType, Any])
+		python_dict = adapter.dump_python(config)
+		return json.dumps(python_dict, indent=4, sort_keys=True)
+
+	def user_credentials_to_json(self) -> str:
+		cfg = self.unsafe_config()
+
+		adapter = TypeAdapter(dict[ArchConfigType, Any])
+		python_dict = adapter.dump_python(cfg)
+		return json.dumps(python_dict, indent=4, sort_keys=True)
+
+	def write_debug(self) -> None:
+		debug(' -- Chosen configuration --')
+		debug(self.user_config_to_json())
+
+	def save(
+		self,
+		dest_path: Path | None = None,
+		creds: bool = False,
+		password: str | None = None,
+	) -> None:
+		save_path = dest_path or DEFAULT_SAVE_PATH
+
+		if not save_path.is_dir():
+			warn(
+				f'Destination directory {save_path} does not exist or is not a directory\n.',
+				'Configuration files can not be saved',
+			)
+			return
+
+		self.save_user_config(save_path)
+		if creds:
+			self.save_user_creds(save_path, password=password)
+
+	def save_user_config(self, dest_path: Path) -> None:
+		if not dest_path.is_dir():
+			error(f'Invalid path {dest_path}. User configuration could not be saved.')
+			return
+
+		target = dest_path / USER_CONFIG_FILE
+		data = self.user_config_to_json()
+		target.write_text(data)
+		target.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP)
+
+	def save_user_creds(
+		self,
+		dest_path: Path,
+		password: str | None = None,
+	) -> None:
+		if not dest_path.is_dir():
+			error(f'Invalid path {dest_path}. User credentials could not be saved.')
+			return
+
+		data = self.user_credentials_to_json()
+
+		if password:
+			data = encrypt(password, data)
+
+		target = dest_path / USER_CREDS_FILE
+		target.write_text(data)
+		target.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP)
+
+	def as_summary(self) -> str:
+		"""
+		Render a concise two-column summary of the current configuration.
+
+		Returns an empty string if nothing meaningful to show.
+		"""
+		cfg: dict[str, str | list[str] | bool] = {}
+
+		for key, value in self.plain_cfg().items():
+			cfg[key.text()] = value
+
+		for config_type, obj in self.sub_cfg().items():
+			if not hasattr(obj, 'summary'):
+				continue
+
+			summary = obj.summary()
+			if summary:
+				cfg[config_type.text()] = summary
+
+		simple_summary = as_key_value_pair(cfg, ignore_empty=True)
+
+		return simple_summary
 
 
 class ArchConfigHandler:
 	def __init__(self) -> None:
 		self._parser: ArgumentParser = self._define_arguments()
-		args: Arguments = self._parse_args()
-		self._args = args
+		self._add_sub_parsers()
 
+		self._args: Arguments = self._parse_args()
 		config = self._parse_config()
 
 		try:
-			self._config = ArchConfig.from_config(config, args)
-			self._config.version = self._get_version()
+			self._config = ArchConfig.from_config(config, self._args)
+			self._config.version = get_version()
 		except ValueError as err:
 			warn(str(err))
-			exit(1)
+			sys.exit(1)
 
 	@property
 	def config(self) -> ArchConfig:
@@ -342,23 +592,22 @@ class ArchConfigHandler:
 	def print_help(self) -> None:
 		self._parser.print_help()
 
-	def _get_version(self) -> str:
-		try:
-			return version('archinstall')
-		except Exception:
-			return 'Archinstall version not found'
+	def _add_sub_parsers(self) -> None:
+		subparsers = self._parser.add_subparsers(dest='command', help='Available subcommands')
+		_ = subparsers.add_parser(SubCommand.SHARE_LOG.value, help='Upload log file to public server')
 
 	def _define_arguments(self) -> ArgumentParser:
 		parser = ArgumentParser(
 			formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 			description='szmelcinstall (Entropy Linux installer) - fork of archinstall',
 		)
+
 		parser.add_argument(
 			'-v',
 			'--version',
 			action='version',
 			default=False,
-			version='%(prog)s ' + self._get_version(),
+			version='%(prog)s ' + get_version(),
 		)
 		parser.add_argument(
 			'--config',
@@ -460,9 +709,16 @@ class ArchConfigHandler:
 		parser.add_argument(
 			'--plugin',
 			nargs='?',
-			type=str,
+			type=Path,
 			default=None,
 			help='File path to a plugin to load',
+		)
+		parser.add_argument(
+			'--plugin-url',
+			type=str,
+			nargs='?',
+			default=None,
+			help='Url to a plugin file to load',
 		)
 		parser.add_argument(
 			'--skip-version-check',
@@ -488,7 +744,6 @@ class ArchConfigHandler:
 			default=False,
 			help='Enabled verbose options',
 		)
-
 		return parser
 
 	def _parse_args(self) -> Arguments:
@@ -504,7 +759,11 @@ class ArchConfigHandler:
 			warn(f'Warning: --debug mode will write certain credentials to {logger.path}!')
 
 		if args.plugin:
-			plugin_path = Path(args.plugin)
+			load_plugin(args.plugin)
+
+		if args.plugin_url:
+			plugin_data = self._fetch_from_url(args.plugin_url)
+			plugin_path = self._write_plugin_to_temp_file(plugin_data)
 			load_plugin(plugin_path)
 
 		if args.creds_decryption_key is None:
@@ -549,37 +808,37 @@ class ArchConfigHandler:
 				except ValueError as err:
 					if 'Invalid password' in str(err):
 						error(tr('Incorrect credentials file decryption password'))
-						exit(1)
+						sys.exit(1)
 					else:
 						debug(f'Error decrypting credentials file: {err}')
 						raise err from err
 			else:
-				incorrect_password = False
+				header = tr('Enter credentials file decryption password')
+				wrong_pwd_text = tr('Incorrect password')
+				prompt = header
 
-				with Tui():
-					while True:
-						header = tr('Incorrect password') if incorrect_password else None
-
-						decryption_pwd = get_password(
-							text=tr('Credentials file decryption password'),
-							header=header,
+				while True:
+					decryption_pwd: Password | None = tui.run(
+						lambda p=prompt: get_password(  # type: ignore[misc]
+							header=p,
 							allow_skip=False,
-							skip_confirmation=True,
+							no_confirmation=True,
 						)
+					)
 
-						if not decryption_pwd:
-							return None
+					if not decryption_pwd:
+						return None
 
-						try:
-							creds_data = decrypt(creds_data, decryption_pwd.plaintext)
-							break
-						except ValueError as err:
-							if 'Invalid password' in str(err):
-								debug('Incorrect credentials file decryption password')
-								incorrect_password = True
-							else:
-								debug(f'Error decrypting credentials file: {err}')
-								raise err from err
+					try:
+						creds_data = decrypt(creds_data, decryption_pwd.plaintext)
+						break
+					except ValueError as err:
+						if 'Invalid password' in str(err):
+							debug('Incorrect credentials file decryption password')
+							prompt = f'{header}' + f'\n\n{wrong_pwd_text}'
+						else:
+							debug(f'Error decrypting credentials file: {err}')
+							raise err from err
 
 		return json.loads(creds_data)
 
@@ -594,12 +853,33 @@ class ArchConfigHandler:
 		else:
 			error('Not a valid url')
 
-		exit(1)
+		sys.exit(1)
+
+	def _write_plugin_to_temp_file(self, plugin_data: str) -> Path:
+		if not plugin_data.strip():
+			error('The downloaded plugin is empty')
+			sys.exit(1)
+
+		tmp_file = tempfile.NamedTemporaryFile(
+			mode='w',
+			suffix='.py',
+			prefix='archinstall_plugin_',
+			delete=False,
+		)
+
+		try:
+			with tmp_file as f:
+				f.write(plugin_data)
+		except OSError as err:
+			error(f'Could not write the downloaded plugin to a temporary file: {err}')
+			sys.exit(1)
+
+		return Path(tmp_file.name)
 
 	def _read_file(self, path: Path) -> str:
 		if not path.exists():
 			error(f'Could not find file {path}')
-			exit(1)
+			sys.exit(1)
 
 		return path.read_text()
 
@@ -613,6 +893,3 @@ class ArchConfigHandler:
 				clean_args[key] = val
 
 		return clean_args
-
-
-arch_config_handler: ArchConfigHandler = ArchConfigHandler()

@@ -1,11 +1,12 @@
-from __future__ import annotations
-
 import shutil
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from archinstall.lib.output import debug, info, warn
+from archinstall.lib.entropy.catalog import EntropyPayload, EntropySpec
+from archinstall.lib.log import debug, info, warn
 
-from .catalog import EntropyPayload, EntropySpec
+if TYPE_CHECKING:
+	from archinstall.lib.installer import Installer
 
 
 def _copy_spec(target_root: Path, spec: EntropySpec) -> None:
@@ -20,7 +21,7 @@ def _copy_spec(target_root: Path, spec: EntropySpec) -> None:
 	shutil.copy2(spec.src, dest)
 
 
-def apply_payload(installation: 'Installer', payload: EntropyPayload) -> None:  # type: ignore[name-defined]
+def apply_payload(installation: Installer, payload: EntropyPayload) -> None:
 	"""
 	Apply packages/configs/commands described by a payload against an installation session.
 	"""

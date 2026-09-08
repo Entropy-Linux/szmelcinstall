@@ -1,20 +1,29 @@
+import json
 import os
 from importlib.metadata import version
 from pathlib import Path
 
 from pytest import MonkeyPatch
 
-from archinstall.default_profiles.profile import GreeterType
+from archinstall.default_profiles.profile import CustomSetting, GreeterType
 from archinstall.lib.args import ArchConfig, ArchConfigHandler, Arguments
 from archinstall.lib.hardware import GfxDriver
-from archinstall.lib.models.application import ApplicationConfiguration, Audio, AudioConfiguration, BluetoothConfiguration
+from archinstall.lib.models.application import (
+	ApplicationConfiguration,
+	Audio,
+	AudioConfiguration,
+	BluetoothConfiguration,
+	PrintServiceConfiguration,
+	ZramConfiguration,
+)
 from archinstall.lib.models.authentication import AuthenticationConfiguration, U2FLoginConfiguration, U2FLoginMethod
 from archinstall.lib.models.bootloader import Bootloader, BootloaderConfiguration
-from archinstall.lib.models.device import DiskLayoutConfiguration, DiskLayoutType
+from archinstall.lib.models.device import DiskLayoutConfiguration, DiskLayoutType, Size
 from archinstall.lib.models.locale import LocaleConfiguration
 from archinstall.lib.models.mirrors import CustomRepository, CustomServer, MirrorConfiguration, MirrorRegion, SignCheck, SignOption
 from archinstall.lib.models.network import NetworkConfiguration, Nic, NicType
 from archinstall.lib.models.packages import Repository
+from archinstall.lib.models.pacman import PacmanConfiguration
 from archinstall.lib.models.profile import ProfileConfiguration
 from archinstall.lib.models.users import Password, User
 from archinstall.lib.profile.profiles_handler import profile_handler
@@ -42,6 +51,7 @@ def test_default_args(monkeypatch: MonkeyPatch) -> None:
 		offline=False,
 		no_pkg_lookups=False,
 		plugin=None,
+		plugin_url=None,
 		skip_version_check=False,
 		advanced=False,
 	)
@@ -98,7 +108,8 @@ def test_correct_parsing_args(
 		debug=True,
 		offline=True,
 		no_pkg_lookups=True,
-		plugin='pytest_plugin.py',
+		plugin=Path('pytest_plugin.py'),
+		plugin_url=None,
 		skip_version_check=True,
 		advanced=True,
 	)
@@ -132,6 +143,7 @@ def test_config_file_parsing(
 		app_config=ApplicationConfiguration(
 			bluetooth_config=BluetoothConfiguration(enabled=True),
 			audio_config=AudioConfiguration(audio=Audio.PIPEWIRE),
+			print_service_config=PrintServiceConfiguration(enabled=True),
 		),
 		auth_config=AuthenticationConfiguration(
 			root_enc_password=Password(enc_password='password_hash'),
@@ -165,10 +177,13 @@ def test_config_file_parsing(
 				{
 					'custom_settings': {
 						'Hyprland': {
-							'seat_access': 'polkit',
+							CustomSetting.SeatAccess: 'polkit',
 						},
 						'Sway': {
-							'seat_access': 'seatd',
+							CustomSetting.SeatAccess: 'seatd',
+						},
+						'KDE Plasma': {
+							CustomSetting.PlasmaFlavor: 'plasma-meta',
 						},
 					},
 					'details': [
@@ -223,8 +238,8 @@ def test_config_file_parsing(
 		kernels=['linux-zen'],
 		ntp=True,
 		packages=['firefox'],
-		parallel_downloads=66,
-		swap=False,
+		pacman_config=PacmanConfiguration(parallel_downloads=66),
+		swap=ZramConfiguration(enabled=False),
 		timezone='UTC',
 		services=['service_1', 'service_2'],
 		custom_commands=["echo 'Hello, World!'"],
@@ -374,3 +389,57 @@ def test_encrypted_creds_with_env_var(
 			groups=[],
 		),
 	]
+
+
+def test_example_config_parsing(
+	monkeypatch: MonkeyPatch,
+	example_config_fixture: Path,
+	example_creds_fixture: Path,
+) -> None:
+	monkeypatch.setattr(
+		'sys.argv',
+		[
+			'archinstall',
+			'--config',
+			str(example_config_fixture),
+			'--creds',
+			str(example_creds_fixture),
+		],
+	)
+
+	handler = ArchConfigHandler()
+	arch_config = handler.config
+
+	assert arch_config.disk_config is not None
+	assert arch_config.profile_config is not None
+	assert arch_config.auth_config is not None
+	assert arch_config.auth_config.users
+
+
+def test_example_config_partitions(example_config_fixture: Path) -> None:
+	# partition entries are only parsed when the configured device is present on
+	# the machine, which is never the case in CI, so read them here directly
+	config = json.loads(example_config_fixture.read_text())
+	device_modifications = config['disk_config']['device_modifications']
+
+	assert device_modifications
+
+	for device in device_modifications:
+		partitions = device['partitions']
+
+		assert partitions
+
+		previous_end = None
+
+		for partition in partitions:
+			assert 'dev_path' in partition
+
+			start = Size.parse_args(partition['start'])
+			end = start + Size.parse_args(partition['size'])
+
+			assert start.is_valid_start()
+
+			if previous_end is not None:
+				assert start >= previous_end
+
+			previous_end = end

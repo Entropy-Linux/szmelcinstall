@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from archinstall.lib.output import debug
+from archinstall.lib.log import debug
 
 if TYPE_CHECKING:
 	from archinstall.lib.installer import Installer
@@ -20,7 +20,7 @@ class BluetoothApp:
 			'bluetooth.service',
 		]
 
-	def install(self, install_session: 'Installer') -> None:
+	def install(self, install_session: Installer) -> None:
 		debug('Installing Bluetooth')
 		install_session.add_additional_packages(self.packages)
 		install_session.enable_service(self.services)

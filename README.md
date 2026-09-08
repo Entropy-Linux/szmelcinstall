@@ -1,10 +1,13 @@
 # SzmelcInstall
 > ### *Archinstall fork for Entropy Linux*
-> ## Version: 12
+> ## Version: 13
+> Rebased onto upstream **archinstall 4.4** (Textual TUI).
 
 ---
 
 # Screenshots
+> *Captured before the 4.4 Textual rewrite — the layout differs, the features do not.*
+>
 > ### **Main TUI layout**
 > <img width="329" height="403" alt="image" src="https://github.com/user-attachments/assets/4a7d14e7-fba5-4cd4-91b7-2f9416413a78" />
 > 
@@ -27,8 +30,11 @@
 - Entropy profile family (Baseline, Server, Desktop PRO/LITE) with JSON metadata in `config/entropy/profiles` and runner `default_profiles/entropy-profiles.py`.
 - JSON-driven Entropy kits, Szmelc config packs, asset packs, and Szmelc package picker under Entropy Tweaks (merges include/exclude packages, config copies, and post-commands).
 - Arch Tweaks: yay (from Chaotic AUR via pacman) and Chaotic AUR repo setup with interactive retry/force/skip/stop.
-- Pacstrap conflict/missing handlers (remove/choose/force/skip, manual rename, strip version) with confirmation prompts.
-- TUI niceties: Entropy-branded header, Ctrl+h help, Ctrl+i info (`INFO.md`), Entropy/Arch Tweaks pinned to the top.
+- Halt-and-ask error recovery instead of aborting the install: package conflicts, missing targets, file conflicts and
+  unsatisfiable dependencies each pause with numbered choices (keep one, keep neither, drop a package, overwrite files),
+  plus **Resolve manually in a shell** and **Exit** on every prompt. Unanswered prompts fall back to the safe choice after
+  60 seconds; where nothing is safe to pick, the installer waits instead of guessing. Everything skipped is re-listed at the end.
+- TUI: Entropy-branded header, Entropy/Arch Tweaks pinned to the top of the main menu, F1 help panel (upstream 4.4 Textual TUI).
 
 ---
 
@@ -54,8 +60,10 @@
 # Tips
 - Use **Configs + Live Cache** if you want browser caches and most live-session state; it still skips machine IDs, NetworkManager state, pacman local DB, and known problematic profiles.
 - Tune the JSON configs to add/remove paths. Excludes are globbed recursively.
-- Ctrl+h/Ctrl+i popups stay until Esc; put your own info in `INFO.md`.
-- If any step fails (pacstrap/repos), prompts let you retry, force, skip, or stop with a clear “Chosen: … Continue? Y/n” confirmation.
+- Press F1 for the key-binding help panel; `INFO.md` documents the fork itself.
+- When a package step fails, the installer halts and prints numbered options. Option "Resolve manually in a shell" drops you to
+  `$SHELL` with the installation paused, and asks whether to resume once you leave it. "Exit" offers to save your configuration first.
+- Leave a prompt unanswered for 60 seconds and it takes the safe option so an unattended install keeps moving.
 
 ---
 

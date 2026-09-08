@@ -1,11 +1,12 @@
 from pathlib import Path
+from subprocess import CalledProcessError
 
 from pydantic import BaseModel
 
+from archinstall.lib.command import SysCommand, run
 from archinstall.lib.exceptions import DiskError, SysCallError
-from archinstall.lib.general import SysCommand
-from archinstall.lib.models.device import LsblkInfo
-from archinstall.lib.output import debug, warn
+from archinstall.lib.log import debug, info, warn
+from archinstall.lib.models.device import LsblkInfo, PartitionGUID
 
 
 class LsblkOutput(BaseModel):
@@ -29,19 +30,18 @@ def _fetch_lsblk_info(
 		cmd.append(str(dev_path))
 
 	try:
-		worker = SysCommand(cmd)
-	except SysCallError as err:
+		result = run(cmd)
+	except CalledProcessError as err:
 		# Get the output minus the message/info from lsblk if it returns a non-zero exit code.
-		if err.worker_log:
-			debug(f'Error calling lsblk: {err.worker_log.decode()}')
+		if stdout := err.stdout:
+			debug(f'Error calling lsblk: {stdout.decode().rstrip()}')
 
 		if dev_path:
 			raise DiskError(f'Failed to read disk "{dev_path}" with lsblk')
 
 		raise err
 
-	output = worker.output(remove_cr=False)
-	return LsblkOutput.model_validate_json(output)
+	return LsblkOutput.model_validate_json(result.stdout)
 
 
 def get_lsblk_info(
@@ -67,12 +67,12 @@ def get_lsblk_output() -> LsblkOutput:
 
 def find_lsblk_info(
 	dev_path: Path | str,
-	info: list[LsblkInfo],
+	info_list: list[LsblkInfo],
 ) -> LsblkInfo | None:
 	if isinstance(dev_path, str):
 		dev_path = Path(dev_path)
 
-	for lsblk_info in info:
+	for lsblk_info in info_list:
 		if lsblk_info.path == dev_path:
 			return lsblk_info
 
@@ -110,7 +110,70 @@ def disk_layouts() -> str:
 	return lsblk_output.model_dump_json(indent=4)
 
 
-def umount(mountpoint: Path, recursive: bool = False) -> None:
+def get_parent_device_path(dev_path: Path) -> Path:
+	lsblk = get_lsblk_info(dev_path)
+	return Path(f'/dev/{lsblk.pkname}')
+
+
+def get_unique_path_for_device(dev_path: Path) -> Path | None:
+	paths = Path('/dev/disk/by-id').glob('*')
+	linked_targets = {p.resolve(): p for p in paths}
+	linked_wwn_targets = {p: linked_targets[p] for p in linked_targets if p.name.startswith('wwn-') or p.name.startswith('nvme-eui.')}
+
+	if dev_path in linked_wwn_targets:
+		return linked_wwn_targets[dev_path]
+
+	if dev_path in linked_targets:
+		return linked_targets[dev_path]
+
+	return None
+
+
+def udev_sync() -> None:
+	try:
+		SysCommand('udevadm settle')
+	except SysCallError as err:
+		debug(f'Failed to synchronize with udev: {err}')
+
+
+def mount(
+	dev_path: Path | str,
+	target_mountpoint: Path,
+	mount_fs: str | None = None,
+	create_target_mountpoint: bool = True,
+	options: list[str] | None = None,
+) -> None:
+	if create_target_mountpoint and not target_mountpoint.exists():
+		target_mountpoint.mkdir(parents=True, exist_ok=True)
+
+	if not target_mountpoint.exists():
+		raise ValueError('Target mountpoint does not exist')
+
+	lsblk_info = get_lsblk_info(dev_path)
+	if target_mountpoint in lsblk_info.mountpoints:
+		info(f'Device already mounted at {target_mountpoint}')
+		return
+
+	cmd = ['mount']
+
+	if options:
+		cmd.extend(('-o', ','.join(options)))
+	if mount_fs:
+		cmd.extend(('-t', mount_fs))
+
+	cmd.extend((str(dev_path), str(target_mountpoint)))
+
+	command = ' '.join(cmd)
+
+	debug(f'Mounting {dev_path}: {command}')
+
+	try:
+		SysCommand(command)
+	except SysCallError as err:
+		raise DiskError(f'Could not mount {dev_path}: {command}\n{err.message}')
+
+
+def umount(mountpoint: Path | str, recursive: bool = False) -> None:
 	lsblk_info = get_lsblk_info(mountpoint)
 
 	if not lsblk_info.mountpoints:
@@ -126,3 +189,17 @@ def umount(mountpoint: Path, recursive: bool = False) -> None:
 	for path in lsblk_info.mountpoints:
 		debug(f'Unmounting mountpoint: {path}')
 		SysCommand(cmd + [str(path)])
+
+
+def swapon(path: Path) -> None:
+	try:
+		SysCommand(['swapon', str(path)])
+	except SysCallError as err:
+		raise DiskError(f'Could not enable swap {path}:\n{err.message}')
+
+
+def linux_root_guid(arch: str | None) -> PartitionGUID:
+	if arch == 'aarch64':
+		return PartitionGUID.LINUX_ROOT_AARCH64
+
+	return PartitionGUID.LINUX_ROOT_X86_64

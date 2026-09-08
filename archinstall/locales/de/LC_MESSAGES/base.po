@@ -53,6 +53,9 @@ msgstr "Wählen Sie einen Audioserver aus"
 msgid "Only packages such as base, base-devel, linux, linux-firmware, efibootmgr and optional profile packages are installed."
 msgstr "Nur Pakete wie base, base-devel, linux, linux-firmware, efibootmgr und optionale Profilpakete werden installiert."
 
+msgid "Note: base-devel is no longer installed by default. Add it here if you need build tools."
+msgstr "Hinweis: base-devel wird nicht mehr standardmäßig installiert. Fügen Sie es hier hinzu, wenn Sie Build-Tools benötigen."
+
 msgid "If you desire a web browser, such as firefox or chromium, you may specify it in the following prompt."
 msgstr "Wenn Sie einen Webbrowser installieren möchten, wie z.B. Firefox oder Chromium, können Sie diese nun eingeben."
 
@@ -296,7 +299,7 @@ msgid "Automatic time sync (NTP)"
 msgstr "Automatische Zeitsynchronisierung (NTP)"
 
 msgid "Install ({} config(s) missing)"
-msgstr "Installieren ({} Konfiguration(en) ausständig)"
+msgstr "Installieren ({} Konfiguration(en) ausstehend)"
 
 msgid ""
 "You decided to skip harddrive selection\n"
@@ -821,6 +824,19 @@ msgstr "Ungültige Eingabe! Erneut mit gültiger Eingabe versuchen [1 bis {max_d
 msgid "Parallel Downloads"
 msgstr "Parallele Downloads"
 
+msgid "Pacman"
+msgstr "Pacman"
+
+msgid "Color"
+msgstr "Farbe"
+
+#, python-brace-format
+msgid "Enter the number of parallel downloads (1-{})"
+msgstr "Anzahl paralleler Downloads eingeben (1-{})"
+
+msgid "Enable colored output for pacman"
+msgstr "Farbige Ausgabe für Pacman aktivieren"
+
 msgid "ESC to skip"
 msgstr "Drücken Sie ESC, um zu überspringen"
 
@@ -851,7 +867,7 @@ msgstr "Konnte Profil nicht von der angegebenen URL holen: {}"
 
 #, python-brace-format
 msgid "Profiles must have unique name, but profile definitions with duplicate name found: {}"
-msgstr "Profile müssen einen eindeutige Namen haben, aber Profildefinition mit gleichem Namen gefunden: {}"
+msgstr "Profile müssen einen eindeutigen Namen haben, aber Profildefinition mit gleichem Namen gefunden: {}"
 
 msgid "Select one or more devices to use and configure"
 msgstr "Wählen Sie ein oder mehrere Gerät(e) aus, die konfiguriert und verwendet werden sollen"
@@ -1034,7 +1050,7 @@ msgid "The proprietary Nvidia driver is not supported by Sway. It is likely that
 msgstr "Der proprietäre Nvidia-Treiber wird von Sway nicht unterstützt. Es ist wahrscheinlich, dass Fehler auftreten werden, trotzdem fortfahren?"
 
 msgid "Installed packages"
-msgstr "Installiere Pakete"
+msgstr "Installierte Pakete"
 
 msgid "Add profile"
 msgstr "Profil hinzufügen"
@@ -1069,7 +1085,7 @@ msgid ""
 msgstr ""
 "\n"
 "\n"
-"Wählen sie einen Grafiktreiber aus oder leer lassen um alle quelloffenen Treiber zu installieren"
+"Wählen Sie einen Grafiktreiber aus oder leer lassen, um alle quelloffenen Treiber zu installieren"
 
 msgid "Sway needs access to your seat (collection of hardware devices i.e. keyboard, mouse, etc)"
 msgstr "Sway benötigt Zugriff auf ihren Seat (Sammlung von Hardwaregeräten wie Tastatur, Maus, usw.)"
@@ -1464,7 +1480,7 @@ msgid "Confirm password"
 msgstr "Passwort bestätigen"
 
 msgid "The confirmation password did not match, please try again"
-msgstr "Das Passwort stimmt nicht überein, bitte versuche es erneut"
+msgstr "Das Passwort stimmt nicht überein, bitte versuchen Sie es erneut"
 
 msgid "Not a valid directory"
 msgstr "Ungültiges Verzeichnis"
@@ -1543,7 +1559,7 @@ msgid "Some packages could not be found in the repository"
 msgstr "Einige Pakete konnten nicht in den Repositorien gefunden werden"
 
 msgid "User"
-msgstr "Benutzername"
+msgstr "Benutzer"
 
 msgid "The specified configuration will be applied"
 msgstr "Die festgelegte Konfiguration wird angewendet"
@@ -1662,6 +1678,123 @@ msgstr "Suchmodus starten"
 msgid "Exit search mode"
 msgstr "Suchmodus beenden"
 
+msgid "General"
+msgstr "Allgemein"
+
+msgid "Navigation"
+msgstr "Navigation"
+
+msgid "Selection"
+msgstr "Auswahl"
+
+msgid "Search"
+msgstr "Suchen"
+
+msgid "Down"
+msgstr "Runter"
+
+msgid "Up"
+msgstr "Hoch"
+
+msgid "Confirm"
+msgstr "Bestätigen und Schließen"
+
+msgid "Focus right"
+msgstr "Nach rechts bewegen"
+
+msgid "Focus left"
+msgstr "Nach links bewegen"
+
+msgid "Toggle"
+msgstr "Umschalten"
+
+msgid "Show/Hide help"
+msgstr "Hilfe anzeigen/ausblenden"
+
+msgid "Quit"
+msgstr "Beenden"
+
+msgid "First"
+msgstr "Erste"
+
+msgid "Last"
+msgstr "Letzte"
+
+msgid "Select"
+msgstr "Auswählen"
+
+msgid "Page Up"
+msgstr "Bild nach oben"
+
+msgid "Page Down"
+msgstr "Bild nach unten"
+
+msgid "Page up"
+msgstr "Bild nach oben"
+
+msgid "Page down"
+msgstr "Bild nach unten"
+
+msgid "Page Left"
+msgstr "Seite nach links"
+
+msgid "Page Right"
+msgstr "Seite nach rechts"
+
+msgid "Cursor up"
+msgstr "Cursor nach oben"
+
+msgid "Cursor down"
+msgstr "Cursor nach unten"
+
+msgid "Cursor right"
+msgstr "Cursor nach rechts"
+
+msgid "Cursor left"
+msgstr "Cursor nach links"
+
+msgid "Top"
+msgstr "Zum Anfang"
+
+msgid "Bottom"
+msgstr "Zum Ende"
+
+msgid "Home"
+msgstr "Pos1"
+
+msgid "End"
+msgstr "Ende"
+
+msgid "Toggle option"
+msgstr "Option umschalten"
+
+msgid "Scroll Up"
+msgstr "Nach oben scrollen"
+
+msgid "Scroll Down"
+msgstr "Nach unten scrollen"
+
+msgid "Scroll Left"
+msgstr "Nach links scrollen"
+
+msgid "Scroll Right"
+msgstr "Nach rechts scrollen"
+
+msgid "Scroll Home"
+msgstr "Zum Anfang scrollen"
+
+msgid "Scroll End"
+msgstr "Zum Ende scrollen"
+
+msgid "Focus Next"
+msgstr "Nächstes fokussieren"
+
+msgid "Focus Previous"
+msgstr "Vorheriges fokussieren"
+
+msgid "Copy selected text"
+msgstr "Ausgewählten Text kopieren"
+
 msgid "labwc needs access to your seat (collection of hardware devices i.e. keyboard, mouse, etc)"
 msgstr "labwc benötigt Zugriff auf ihren Seat (Sammlung von Hardwaregeräten wie Tastatur, Maus, usw.)"
 
@@ -1733,6 +1866,15 @@ msgstr "Bluetooth"
 msgid "Would you like to configure Bluetooth?"
 msgstr "Möchten Sie Bluetooth aktivieren?"
 
+msgid "Print service"
+msgstr "Drucker-Service"
+
+msgid "Would you like to configure the print service?"
+msgstr "Möchten Sie den Drucker-Service konfigurieren?"
+
+msgid "Power management"
+msgstr "Energieverwaltung"
+
 msgid "Authentication"
 msgstr "Authentifizierung"
 
@@ -1782,66 +1924,275 @@ msgid "You may need to enter the PIN and then touch your U2F device to register 
 msgstr "Sie müssen möglicherweise Ihre PIN eingeben und danach Ihr U2F-Gerät berühren, um es zu registrieren"
 
 msgid "Starting device modifications in "
-msgstr ""
+msgstr "Starte Geräteänderungen in "
 
-#, fuzzy
 msgid "No network connection found"
-msgstr "Keine Netzwerkkonfiguration"
+msgstr "Keine Netzwerkverbindung gefunden"
 
-#, fuzzy
 msgid "Would you like to connect to a Wifi?"
-msgstr "Möchten Sie fortfahren?"
+msgstr "Möchten Sie sich mit einem WLAN verbinden?"
 
-#, fuzzy
 msgid "No wifi interface found"
-msgstr "Schnittstellen konfigurieren"
+msgstr "Kein WLAN-Interface gefunden"
 
-#, fuzzy
 msgid "Select wifi network to connect to"
-msgstr "Wählen Sie einen Netzwerkadapter zur Konfiguration aus"
+msgstr "WLAN-Netzwerk zum Verbinden auswählen"
 
 msgid "Scanning wifi networks..."
-msgstr ""
+msgstr "Suche nach WLAN-Netzwerken..."
 
-#, fuzzy
 msgid "No wifi networks found"
-msgstr "Keine Netzwerkkonfiguration"
+msgstr "Keine WLAN-Netzwerke gefunden"
 
 msgid "Failed setting up wifi"
-msgstr ""
+msgstr "WLAN-Einrichtung fehlgeschlagen."
 
-#, fuzzy
 msgid "Enter wifi password"
-msgstr "Passwort eingeben: "
+msgstr "WLAN-Passwort eingeben"
 
 msgid "Ok"
-msgstr ""
+msgstr "Ok"
 
 msgid "Removable"
-msgstr ""
+msgstr "Wechseldatenträger"
 
 msgid "Install to removable location"
-msgstr ""
+msgstr "Auf Wechseldatenträger installieren"
 
 msgid "Will install to /EFI/BOOT/ (removable location)"
-msgstr ""
+msgstr "Wird in /EFI/BOOT/ installiert (Wechseldatenträger)"
 
 msgid "Will install to standard location with NVRAM entry"
-msgstr ""
+msgstr "Wird am Standardpfad mit NVRAM-Eintrag installiert"
 
 msgid "Would you like to install the bootloader to the default removable media search location?"
-msgstr ""
+msgstr "Möchten Sie den Bootloader am Standard-Suchpfad für Wechseldatenträger installieren?"
 
 msgid "This installs the bootloader to /EFI/BOOT/BOOTX64.EFI (or similar) which is useful for:"
-msgstr ""
+msgstr "Dies installiert den Bootloader unter /EFI/BOOT/BOOTX64.EFI (oder ähnlich), was nützlich ist für:"
 
 msgid "USB drives or other portable external media."
-msgstr ""
+msgstr "USB-Sticks oder andere tragbare externe Datenträger."
 
 msgid "Systems where you want the disk to be bootable on any computer."
-msgstr ""
+msgstr "Systeme, bei denen der Datenträger auf jedem Computer bootfähig sein soll."
 
 msgid "Firmware that does not properly support NVRAM boot entries."
+msgstr "Firmware, die NVRAM-Starteinträge nicht korrekt unterstützt."
+
+msgid "Will install to /EFI/BOOT/ (removable location, safe default)"
+msgstr "Wird in /EFI/BOOT/ installiert (Wechseldatenträger-Pfad, sichere Voreinstellung)"
+
+msgid "Will install to custom location with NVRAM entry"
+msgstr "Wird am benutzerdefinierten Pfad mit NVRAM-Eintrag installiert"
+
+msgid "Firmware that does not properly support NVRAM boot entries like most MSI motherboards,"
+msgstr "Firmware, die NVRAM-Starteinträge nicht korrekt unterstützt, wie die meisten MSI-Mainboards,"
+
+msgid "most Apple Macs, many laptops..."
+msgstr "die meisten Apple Macs, viele Laptops..."
+
+msgid "Language"
+msgstr "Sprache"
+
+msgid "Compression algorithm"
+msgstr "Komprimierungsalgorithmus"
+
+msgid "Only packages such as base, sudo, linux, linux-firmware, efibootmgr and optional profile packages are installed."
+msgstr "Nur Pakete wie base, sudo, linux, linux-firmware, efibootmgr und optionale Profilpakete werden installiert."
+
+msgid "Select zram compression algorithm:"
+msgstr "Zram-Komprimierungsalgorithmus auswählen:"
+
+msgid "Use Network Manager (default backend)"
+msgstr "NetworkManager verwenden (Standard-Backend)"
+
+msgid "Use Network Manager (iwd backend)"
+msgstr "NetworkManager verwenden (iwd-Backend)"
+
+msgid "Firewall"
+msgstr "Firewall"
+
+#, fuzzy
+msgid "Additional fonts"
+msgstr "Zusätzliche Repositorien"
+
+#, fuzzy
+msgid "Select font packages to install"
+msgstr "Bootloader zur Installation auswählen"
+
+msgid "Unicode font coverage for most languages"
+msgstr ""
+
+msgid "color emoji for browsers and apps"
+msgstr ""
+
+msgid "Chinese, Japanese, Korean characters"
+msgstr ""
+
+msgid "Select audio configuration"
+msgstr "Audiokonfiguration auswählen"
+
+msgid "Enter credentials file decryption password"
+msgstr "Passwort für die Entschlüsselung der Anmeldedaten-Datei"
+
+msgid "Enter root password"
+msgstr "Root-Passwort eingeben"
+
+msgid "Select bootloader to install"
+msgstr "Bootloader zur Installation auswählen"
+
+msgid "Configuration preview"
+msgstr "Konfigurationsvorschau"
+
+msgid "Enter a directory for the configuration(s) to be saved"
+msgstr "Verzeichnis für die zu speichernden Konfiguration(en) eingeben"
+
+msgid "Select encryption type"
+msgstr "Verschlüsselungstyp"
+
+msgid "Select disks for the installation"
+msgstr "Festplatten für die Installation auswählen"
+
+msgid "Enter a mountpoint"
+msgstr "Wählen Sie einen Einhängeort aus:"
+
+#, python-brace-format
+msgid "Enter a size (default: {}): "
+msgstr "Größe eingeben (Standard: {}): "
+
+msgid "Enter subvolume name"
+msgstr "Name des Subvolumes"
+
+msgid "Enter subvolume mountpoint"
+msgstr "Subvolume-Einhängeort"
+
+msgid "Select a disk configuration"
+msgstr "Laufwerkskonfiguration"
+
+msgid "Enter root mount directory"
+msgstr "Einhängeverzeichnis der Root-Partition"
+
+msgid "You will use whatever drive-setup is mounted at the specified directory"
+msgstr "Es wird das Laufwerk-Setup verwendet, das im angegebenen Verzeichnis eingehängt ist"
+
+msgid "WARNING: Archinstall won't check the suitability of this setup"
+msgstr "WARNUNG: Archinstall überprüft die Eignung dieser Konfiguration nicht"
+
+msgid "Select main filesystem"
+msgstr "Hauptdateisystem auswählen"
+
+msgid "Enter a hostname"
+msgstr "Hostnamen eingeben"
+
+msgid "Select timezone"
+msgstr "Wählen Sie eine Zeitzone aus"
+
+msgid "Enter the number of parallel downloads to be enabled"
+msgstr "Anzahl paralleler Downloads eingeben"
+
+#, python-brace-format
+msgid "Value must be between 1 and {}"
+msgstr "Der Wert muss zwischen 1 und {} liegen"
+
+msgid "Select which kernel(s) to install"
+msgstr "Zu installierenden Kernel auswählen"
+
+msgid "Enter a respository name"
+msgstr "Name des Repositoriums"
+
+msgid "Enter the repository url"
+msgstr "Repository-URL eingeben"
+
+msgid "Enter server url"
+msgstr "Server-URL"
+
+msgid "Select mirror regions to be enabled"
+msgstr "Zu aktivierende Spiegelserver-Regionen auswählen"
+
+msgid "Select optional repositories to be enabled"
+msgstr "Optionale Repositorien auswählen"
+
+msgid "Select an interface"
+msgstr "Netzwerkschnittstelle auswählen"
+
+msgid "Choose network configuration"
+msgstr "Netzwerkkonfiguration wählen"
+
+msgid "No packages found"
+msgstr "Keine Pakete gefunden"
+
+msgid "Select which greeter to install"
+msgstr "Zu installierenden Greeter auswählen"
+
+msgid "Select a profile type"
+msgstr "Profiltyp auswählen"
+
+msgid "Enter new password"
+msgstr "Neues Passwort eingeben"
+
+msgid "Enter a username"
+msgstr "Benutzernamen eingeben"
+
+msgid "Enter a password"
+msgstr "Passwort eingeben: "
+
+msgid "The password did not match, please try again"
+msgstr "Das Passwort stimmt nicht überein, bitte versuchen Sie es erneut"
+
+msgid "Password strength: Weak"
+msgstr "Passwortstärke: Schwach"
+
+msgid "Password strength: Moderate"
+msgstr "Passwortstärke: Mittel"
+
+msgid "Password strength: Strong"
+msgstr "Passwortstärke: Stark"
+
+msgid "The selected desktop profile requires a regular user to log in via the greeter"
+msgstr "Das ausgewählte Desktop-Profil erfordert einen regulären Benutzer zur Anmeldung über den Greeter"
+
+#, python-brace-format
+msgid "Environment type: {} {}"
+msgstr "Umgebungstyp: {} {}"
+
+msgid "Input cannot be empty"
+msgstr "Der Wert darf nicht leer sein"
+
+msgid "Recommended"
+msgstr "Empfohlen"
+
+msgid "Package"
+msgstr "Paket"
+
+msgid "Curated selection of KDE Plasma packages"
+msgstr "Kuratierte Auswahl an KDE-Plasma-Paketen"
+
+msgid "Dependencies"
+msgstr "Abhängigkeiten"
+
+msgid "Package group"
+msgstr "Paketgruppe"
+
+msgid "Extensive KDE Plasma installation"
+msgstr "Umfangreiche KDE-Plasma-Installation"
+
+msgid "Packages in group"
+msgstr "Pakete in der Gruppe"
+
+msgid "Minimal KDE Plasma installation"
+msgstr "Minimale KDE-Plasma-Installation"
+
+msgid "Description"
+msgstr "Beschreibung"
+
+msgid "Select a flavor of KDE Plasma to install"
+msgstr "KDE-Plasma-Variante zur Installation auswählen"
+
+msgid "Arial/Times/Courier replacement, Cyrillic support for Steam/games"
+msgstr ""
+
+msgid "wide Unicode coverage, good fallback font"
 msgstr ""
 
 #~ msgid "All open-source"

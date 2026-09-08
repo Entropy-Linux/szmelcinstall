@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import cached_property
-from typing import Any, override
+from typing import Any, Self, override
 
 from pydantic import BaseModel
 
@@ -13,21 +13,9 @@ class Repository(Enum):
 	Extra = 'extra'
 	Multilib = 'multilib'
 	Testing = 'testing'
-
-	def get_repository_list(self) -> list[str]:
-		match self:
-			case Repository.Core:
-				return [Repository.Core.value]
-			case Repository.Extra:
-				return [Repository.Extra.value]
-			case Repository.Multilib:
-				return [Repository.Multilib.value]
-			case Repository.Testing:
-				return [
-					'core-testing',
-					'extra-testing',
-					'multilib-testing',
-				]
+	MultilibTesting = 'multilib-testing'
+	CoreTesting = 'core-testing'
+	ExtraTesting = 'extra-testing'
 
 
 @dataclass
@@ -59,9 +47,9 @@ class PackageSearchResult:
 	makedepends: list[str]
 	checkdepends: list[str]
 
-	@staticmethod
-	def from_json(data: dict[str, Any]) -> 'PackageSearchResult':
-		return PackageSearchResult(**data)
+	@classmethod
+	def from_json(cls, data: dict[str, Any]) -> Self:
+		return cls(**data)
 
 	@property
 	def pkg_version(self) -> str:
@@ -74,7 +62,7 @@ class PackageSearchResult:
 
 		return self.pkg_version == other.pkg_version
 
-	def __lt__(self, other: 'PackageSearchResult') -> bool:
+	def __lt__(self, other: Self) -> bool:
 		return self.pkg_version < other.pkg_version
 
 
@@ -87,11 +75,11 @@ class PackageSearch:
 	page: int
 	results: list[PackageSearchResult]
 
-	@staticmethod
-	def from_json(data: dict[str, Any]) -> 'PackageSearch':
+	@classmethod
+	def from_json(cls, data: dict[str, Any]) -> Self:
 		results = [PackageSearchResult.from_json(r) for r in data['results']]
 
-		return PackageSearch(
+		return cls(
 			version=data['version'],
 			limit=data['limit'],
 			valid=data['valid'],
@@ -117,7 +105,7 @@ class LocalPackage(BaseModel):
 
 		return self.version == other.version
 
-	def __lt__(self, other: 'LocalPackage') -> bool:
+	def __lt__(self, other: Self) -> bool:
 		return self.version < other.version
 
 
@@ -144,7 +132,6 @@ class AvailablePackage(BaseModel):
 	def longest_key(self) -> int:
 		return max(len(key) for key in self.model_dump().keys())
 
-	# return all package info line by line
 	def info(self) -> str:
 		output = ''
 		for key, value in self.model_dump().items():
@@ -154,6 +141,14 @@ class AvailablePackage(BaseModel):
 
 		return output
 
+	@cached_property
+	def get_depends_on(self) -> list[str]:
+		return [entry.strip() for entry in self.depends_on.split(' ') if entry.strip()]
+
+	@cached_property
+	def get_optional_deps(self) -> list[str]:
+		return [entry.strip() for entry in self.optional_deps.split(' ') if entry.strip()]
+
 
 @dataclass
 class PackageGroup:
@@ -161,11 +156,17 @@ class PackageGroup:
 	packages: list[str] = field(default_factory=list)
 
 	@classmethod
+	def from_package_group_output(cls, data: list[str]) -> Self:
+		name = data[0].split()[0].strip()
+		packages = [line.split()[1].strip() for line in data if line.strip()]
+		return cls(name, packages)
+
+	@classmethod
 	def from_available_packages(
 		cls,
 		packages: dict[str, AvailablePackage],
-	) -> dict[str, 'PackageGroup']:
-		pkg_groups: dict[str, 'PackageGroup'] = {}
+	) -> dict[str, Self]:
+		pkg_groups: dict[str, Self] = {}
 
 		for pkg in packages.values():
 			if 'None' in pkg.groups:
@@ -178,7 +179,7 @@ class PackageGroup:
 				if len(group) == 0:
 					continue
 
-				pkg_groups.setdefault(group, PackageGroup(group))
+				pkg_groups.setdefault(group, cls(group))
 				pkg_groups[group].packages.append(pkg.name)
 
 		return pkg_groups

@@ -1,24 +1,24 @@
 import textwrap
 from typing import override
 
+from archinstall.lib.menu.abstract_menu import AbstractSubMenu
+from archinstall.lib.menu.helpers import Confirmation, Selection
+from archinstall.lib.models.bootloader import Bootloader, BootloaderConfiguration, PlymouthTheme
 from archinstall.lib.translationhandler import tr
-from archinstall.tui.curses_menu import SelectMenu
 from archinstall.tui.menu_item import MenuItem, MenuItemGroup
 from archinstall.tui.result import ResultType
-from archinstall.tui.types import Alignment, FrameProperties, Orientation
-
-from ..args import arch_config_handler
-from ..hardware import SysInfo
-from ..menu.abstract_menu import AbstractSubMenu
-from ..models.bootloader import Bootloader, BootloaderConfiguration
 
 
 class BootloaderMenu(AbstractSubMenu[BootloaderConfiguration]):
 	def __init__(
 		self,
 		bootloader_conf: BootloaderConfiguration,
+		uefi: bool,
+		skip_boot: bool = False,
 	):
 		self._bootloader_conf = bootloader_conf
+		self._skip_boot = skip_boot
+		self._uefi = uefi
 		menu_options = self._define_menu_options()
 
 		self._item_group = MenuItemGroup(menu_options, sort_items=False, checkmarks=True)
@@ -30,15 +30,14 @@ class BootloaderMenu(AbstractSubMenu[BootloaderConfiguration]):
 
 	def _define_menu_options(self) -> list[MenuItem]:
 		bootloader = self._bootloader_conf.bootloader
-		has_uefi = SysInfo.has_uefi()
 
 		# UKI availability
-		uki_enabled = has_uefi and bootloader.has_uki_support()
+		uki_enabled = self._uefi and bootloader.has_uki_support()
 		if not uki_enabled:
 			self._bootloader_conf.uki = False
 
 		# Removable availability
-		removable_enabled = has_uefi and bootloader.has_removable_support()
+		removable_enabled = self._uefi and bootloader.has_removable_support()
 		if not removable_enabled:
 			self._bootloader_conf.removable = False
 
@@ -67,6 +66,13 @@ class BootloaderMenu(AbstractSubMenu[BootloaderConfiguration]):
 				key='removable',
 				enabled=removable_enabled,
 			),
+			MenuItem(
+				text=tr('Plymouth'),
+				action=self._select_plymouth,
+				value=self._bootloader_conf.plymouth,
+				preview_action=self._prev_plymouth,
+				key='plymouth',
+			),
 		]
 
 	def _prev_bootloader(self, item: MenuItem) -> str | None:
@@ -83,24 +89,26 @@ class BootloaderMenu(AbstractSubMenu[BootloaderConfiguration]):
 
 	def _prev_removable(self, item: MenuItem) -> str | None:
 		if item.value:
-			return tr('Will install to /EFI/BOOT/ (removable location)')
-		return tr('Will install to standard location with NVRAM entry')
+			return tr('Will install to /EFI/BOOT/ (removable location, safe default)')
+		return tr('Will install to custom location with NVRAM entry')
+
+	def _prev_plymouth(self, item: MenuItem) -> str | None:
+		if item.value:
+			return f'{tr("Plymouth")}: {item.value.value}'
+		return None
 
 	@override
-	def run(
-		self,
-		additional_title: str | None = None,
-	) -> BootloaderConfiguration:
-		super().run(additional_title=additional_title)
+	async def show(self) -> BootloaderConfiguration:
+		_ = await super().show()
 		return self._bootloader_conf
 
-	def _select_bootloader(self, preset: Bootloader | None) -> Bootloader | None:
-		bootloader = ask_for_bootloader(preset)
+	async def _select_bootloader(self, preset: Bootloader | None) -> Bootloader | None:
+		bootloader = await select_bootloader(preset, self._uefi, self._skip_boot)
 
 		if bootloader:
 			# Update UKI option based on bootloader
 			uki_item = self._menu_item_group.find_by_key('uki')
-			if not SysInfo.has_uefi() or not bootloader.has_uki_support():
+			if not self._uefi or not bootloader.has_uki_support():
 				uki_item.enabled = False
 				uki_item.value = False
 				self._bootloader_conf.uki = False
@@ -109,29 +117,53 @@ class BootloaderMenu(AbstractSubMenu[BootloaderConfiguration]):
 
 			# Update removable option based on bootloader
 			removable_item = self._menu_item_group.find_by_key('removable')
-			if not SysInfo.has_uefi() or not bootloader.has_removable_support():
+			if not self._uefi or not bootloader.has_removable_support():
 				removable_item.enabled = False
 				removable_item.value = False
 				self._bootloader_conf.removable = False
 			else:
+				if not removable_item.enabled:
+					removable_item.value = True
+					self._bootloader_conf.removable = True
 				removable_item.enabled = True
 
 		return bootloader
 
-	def _select_uki(self, preset: bool) -> bool:
+	async def _select_plymouth(self, preset: PlymouthTheme | None) -> PlymouthTheme | None:
+		# Plymouth is purely cosmetic and a frequent source of boot breakage
+		# (notably with the NVIDIA driver and disk encryption), so confirm before
+		# enabling it. When it is already enabled the user is only changing the
+		# theme, so the warning is skipped.
+		if preset is None:
+			prompt = (
+				'[ansi_bright_yellow]'
+				+ tr('Plymouth adds a cosmetic boot splash but can cause boot problems on some setups:')
+				+ '\n\n  • '
+				+ tr('black screen with the NVIDIA driver')
+				+ '\n  • '
+				+ tr('hidden password prompt with disk encryption (LUKS)')
+				+ '\n\n'
+				+ tr('Would you like to enable it?')
+				+ '[/]\n'
+			)
+
+			result = await Confirmation(header=prompt, allow_skip=True, preset=False).show()
+
+			match result.type_:
+				case ResultType.Skip:
+					return preset
+				case ResultType.Selection:
+					if not result.get_value():
+						return preset
+				case ResultType.Reset:
+					raise ValueError('Unhandled result type')
+
+		return await select_plymouth_theme(preset)
+
+	async def _select_uki(self, preset: bool) -> bool:
 		prompt = tr('Would you like to use unified kernel images?') + '\n'
 
-		group = MenuItemGroup.yes_no()
-		group.set_focus_by_value(preset)
-
-		result = SelectMenu[bool](
-			group,
-			header=prompt,
-			columns=2,
-			orientation=Orientation.HORIZONTAL,
-			alignment=Alignment.CENTER,
-			allow_skip=True,
-		).run()
+		result = await Confirmation(header=prompt, allow_skip=True, preset=preset).show()
 
 		match result.type_:
 			case ResultType.Skip:
@@ -141,84 +173,83 @@ class BootloaderMenu(AbstractSubMenu[BootloaderConfiguration]):
 			case ResultType.Reset:
 				raise ValueError('Unhandled result type')
 
-	def _select_removable(self, preset: bool) -> bool:
+	async def _select_removable(self, preset: bool) -> bool:
 		prompt = (
 			tr('Would you like to install the bootloader to the default removable media search location?')
 			+ '\n\n'
 			+ tr('This installs the bootloader to /EFI/BOOT/BOOTX64.EFI (or similar) which is useful for:')
 			+ '\n\n  • '
+			+ tr('Firmware that does not properly support NVRAM boot entries like most MSI motherboards,')
+			+ '\n	 '
+			+ tr('most Apple Macs, many laptops...')
+			+ '\n  • '
 			+ tr('USB drives or other portable external media.')
 			+ '\n  • '
 			+ tr('Systems where you want the disk to be bootable on any computer.')
-			+ '\n  • '
-			+ tr('Firmware that does not properly support NVRAM boot entries.')
 			+ '\n\n'
 			+ tr(
 				textwrap.dedent(
 					"""\
-					This is NOT recommended if none of the above apply, as it makes installing multiple
-					EFI bootloaders on the same disk more challenging, and it overwrites whatever bootloader
-					was previously installed on the default removable media search location, if any.
+					If you do not know what this means, LEAVE THIS OPTION ENABLED, as it is the safe default.
+
+					It is suggested to disable this if none of the above apply, as it makes installing multiple
+					EFI bootloaders on the same disk easier, and it will not overwrite whatever bootloader
+					was previously installed at the default removable media search location, if any.
+
+					It may also make the installation more resilient in case of dual-booting with Windows,
+					as Windows is known to sometimes erase or replace the bootloader installed at the removable
+					location.
 					"""
 				)
 			)
 			+ '\n'
 		)
 
-		group = MenuItemGroup.yes_no()
-		group.set_focus_by_value(preset)
-
-		result = SelectMenu[bool](
-			group,
+		result = await Confirmation(
 			header=prompt,
-			columns=2,
-			orientation=Orientation.HORIZONTAL,
-			alignment=Alignment.CENTER,
 			allow_skip=True,
-		).run()
+			preset=preset,
+		).show()
 
 		match result.type_:
 			case ResultType.Skip:
 				return preset
 			case ResultType.Selection:
-				return result.item() == MenuItem.yes()
+				return result.get_value()
 			case ResultType.Reset:
 				raise ValueError('Unhandled result type')
 
 
-def ask_for_bootloader(preset: Bootloader | None) -> Bootloader | None:
+async def select_bootloader(
+	preset: Bootloader | None,
+	uefi: bool,
+	skip_boot: bool = False,
+) -> Bootloader | None:
 	options = []
 	hidden_options = []
-	default = None
-	header = None
+	header = tr('Select bootloader to install')
 
-	if arch_config_handler.args.skip_boot:
-		default = Bootloader.NO_BOOTLOADER
-	else:
+	default = Bootloader.get_default(uefi, skip_boot)
+
+	if not skip_boot:
 		hidden_options += [Bootloader.NO_BOOTLOADER]
 
-	if not SysInfo.has_uefi():
+	if not uefi:
 		options += [Bootloader.Grub, Bootloader.Limine]
-		if not default:
-			default = Bootloader.Grub
-		header = tr('UEFI is not detected and some options are disabled')
+		header += '\n' + tr('UEFI is not detected and some options are disabled')
 	else:
 		options += [b for b in Bootloader if b not in hidden_options]
-		if not default:
-			default = Bootloader.Systemd
 
 	items = [MenuItem(o.value, value=o) for o in options]
 	group = MenuItemGroup(items)
 	group.set_default_by_value(default)
 	group.set_focus_by_value(preset)
 
-	result = SelectMenu[Bootloader](
+	result = await Selection[Bootloader](
 		group,
 		header=header,
-		alignment=Alignment.CENTER,
-		frame=FrameProperties.min(tr('Bootloader')),
 		allow_skip=True,
-	).run()
+	).show()
 
 	match result.type_:
 		case ResultType.Skip:
@@ -227,3 +258,24 @@ def ask_for_bootloader(preset: Bootloader | None) -> Bootloader | None:
 			return result.get_value()
 		case ResultType.Reset:
 			raise ValueError('Unhandled result type')
+
+
+async def select_plymouth_theme(preset: PlymouthTheme | None = None) -> PlymouthTheme | None:
+	items = [MenuItem(t.value, value=t) for t in PlymouthTheme]
+	group = MenuItemGroup(items, sort_items=False)
+	group.set_focus_by_value(preset)
+
+	result = await Selection[PlymouthTheme](
+		group,
+		header=tr('Select Plymouth theme'),
+		allow_reset=True,
+		allow_skip=True,
+	).show()
+
+	match result.type_:
+		case ResultType.Skip:
+			return preset
+		case ResultType.Reset:
+			return None
+		case ResultType.Selection:
+			return PlymouthTheme(result.get_value())

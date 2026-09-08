@@ -1,10 +1,9 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import NotRequired, TypedDict, override
+from typing import NotRequired, Self, TypedDict, override
 
+from archinstall.lib.crypt import crypt_yescrypt
 from archinstall.lib.translationhandler import tr
-
-from ..crypt import crypt_yescrypt
 
 
 class PasswordStrength(Enum):
@@ -37,23 +36,22 @@ class PasswordStrength(Enum):
 			case PasswordStrength.STRONG:
 				return 'green'
 
-	@classmethod
-	def strength(cls, password: str) -> 'PasswordStrength':
+	@staticmethod
+	def strength(password: str) -> PasswordStrength:
 		digit = any(character.isdigit() for character in password)
 		upper = any(character.isupper() for character in password)
 		lower = any(character.islower() for character in password)
 		symbol = any(not character.isalnum() for character in password)
-		return cls._check_password_strength(digit, upper, lower, symbol, len(password))
+		return PasswordStrength._check_password_strength(digit, upper, lower, symbol, len(password))
 
-	@classmethod
+	@staticmethod
 	def _check_password_strength(
-		cls,
 		digit: bool,
 		upper: bool,
 		lower: bool,
 		symbol: bool,
 		length: int,
-	) -> 'PasswordStrength':
+	) -> PasswordStrength:
 		# suggested evaluation
 		# https://github.com/archlinux/archinstall/issues/1304#issuecomment-1146768163
 		if digit and upper and lower and symbol:
@@ -185,8 +183,8 @@ class User:
 	def parse_arguments(
 		cls,
 		args: list[UserSerialization],
-	) -> list['User']:
-		users: list[User] = []
+	) -> list[Self]:
+		users = []
 
 		for entry in args:
 			username = entry.get('username')
@@ -201,10 +199,10 @@ class User:
 			elif enc_password:
 				password = Password(enc_password=enc_password)
 
-			if username is None or password is None:
+			if not username or password is None:
 				continue
 
-			user = User(
+			user = cls(
 				username=username,
 				password=password,
 				sudo=entry.get('sudo', False) is True,

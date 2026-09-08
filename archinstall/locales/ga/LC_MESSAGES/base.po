@@ -53,6 +53,9 @@ msgstr "Roghnaigh freastalaí fuaime"
 msgid "Only packages such as base, base-devel, linux, linux-firmware, efibootmgr and optional profile packages are installed."
 msgstr "Ní shuiteáiltear ach pacáistí cosúil le pacáistí bonn, base-devel, linux, linux-firmware, efibootmgr agus próifíl roghnach."
 
+msgid "Note: base-devel is no longer installed by default. Add it here if you need build tools."
+msgstr ""
+
 msgid "If you desire a web browser, such as firefox or chromium, you may specify it in the following prompt."
 msgstr "Más mian leat brabhsálaí gréasáin, mar firefox nó cróimiam, is féidir leat é a shonrú sa leid seo a leanas."
 
@@ -819,6 +822,22 @@ msgstr "Ionchur neamhbhailí! Bain triail eile as le hionchur bailí [1 go {max_
 
 msgid "Parallel Downloads"
 msgstr "Comhuaineach íosluchtuithe"
+
+msgid "Pacman"
+msgstr ""
+
+msgid "Color"
+msgstr ""
+
+#, fuzzy, python-brace-format
+msgid "Enter the number of parallel downloads (1-{})"
+msgstr ""
+"Cuir isteach líon na n-íoslódálacha comhthreomhara atá le cumasú.\n"
+"\n"
+"Nóta:\n"
+
+msgid "Enable colored output for pacman"
+msgstr ""
 
 msgid "ESC to skip"
 msgstr "ESC a scipeáil"
@@ -1728,6 +1747,128 @@ msgstr ""
 msgid "Exit search mode"
 msgstr ""
 
+msgid "General"
+msgstr ""
+
+#, fuzzy
+msgid "Navigation"
+msgstr "Sábháil cumraíocht"
+
+#, fuzzy
+msgid "Selection"
+msgstr "Roghnaigh an rogha sínithe"
+
+msgid "Search"
+msgstr ""
+
+msgid "Down"
+msgstr ""
+
+msgid "Up"
+msgstr ""
+
+#, fuzzy
+msgid "Confirm"
+msgstr "Deimhnigh agus scoir"
+
+msgid "Focus right"
+msgstr ""
+
+msgid "Focus left"
+msgstr ""
+
+msgid "Toggle"
+msgstr ""
+
+msgid "Show/Hide help"
+msgstr ""
+
+msgid "Quit"
+msgstr ""
+
+msgid "First"
+msgstr ""
+
+msgid "Last"
+msgstr ""
+
+#, fuzzy
+msgid "Select"
+msgstr "Roghnaigh an rogha sínithe"
+
+msgid "Page Up"
+msgstr ""
+
+msgid "Page Down"
+msgstr ""
+
+msgid "Page up"
+msgstr ""
+
+msgid "Page down"
+msgstr ""
+
+msgid "Page Left"
+msgstr ""
+
+msgid "Page Right"
+msgstr ""
+
+msgid "Cursor up"
+msgstr ""
+
+msgid "Cursor down"
+msgstr ""
+
+msgid "Cursor right"
+msgstr ""
+
+msgid "Cursor left"
+msgstr ""
+
+msgid "Top"
+msgstr ""
+
+msgid "Bottom"
+msgstr ""
+
+msgid "Home"
+msgstr ""
+
+msgid "End"
+msgstr ""
+
+#, fuzzy
+msgid "Toggle option"
+msgstr "Roghanna subvolume"
+
+msgid "Scroll Up"
+msgstr ""
+
+msgid "Scroll Down"
+msgstr ""
+
+msgid "Scroll Left"
+msgstr ""
+
+msgid "Scroll Right"
+msgstr ""
+
+msgid "Scroll Home"
+msgstr ""
+
+msgid "Scroll End"
+msgstr ""
+
+msgid "Focus Next"
+msgstr ""
+
+msgid "Focus Previous"
+msgstr ""
+
+msgid "Copy selected text"
+msgstr ""
+
 #, fuzzy
 msgid "labwc needs access to your seat (collection of hardware devices i.e. keyboard, mouse, etc)"
 msgstr "Teastaíonn rochtain ó Sway ar do shuíochán (bailiúchán de ghléasanna crua-earraí i.e. méarchlár, luch, srl)"
@@ -1824,6 +1965,17 @@ msgstr ""
 #, fuzzy
 msgid "Would you like to configure Bluetooth?"
 msgstr "Ar mhaith leat comhbhrú BTRFS a úsáid?"
+
+msgid "Print service"
+msgstr ""
+
+#, fuzzy
+msgid "Would you like to configure the print service?"
+msgstr "Ar mhaith leat comhbhrú BTRFS a úsáid?"
+
+#, fuzzy
+msgid "Power management"
+msgstr "Bainistíocht críochdheighilte: {}"
 
 msgid "Authentication"
 msgstr ""
@@ -1935,4 +2087,254 @@ msgid "Systems where you want the disk to be bootable on any computer."
 msgstr ""
 
 msgid "Firmware that does not properly support NVRAM boot entries."
+msgstr ""
+
+msgid "Will install to /EFI/BOOT/ (removable location, safe default)"
+msgstr ""
+
+msgid "Will install to custom location with NVRAM entry"
+msgstr ""
+
+msgid "Firmware that does not properly support NVRAM boot entries like most MSI motherboards,"
+msgstr ""
+
+msgid "most Apple Macs, many laptops..."
+msgstr ""
+
+#, fuzzy
+msgid "Language"
+msgstr "Teanga logánta"
+
+msgid "Compression algorithm"
+msgstr ""
+
+#, fuzzy
+msgid "Only packages such as base, sudo, linux, linux-firmware, efibootmgr and optional profile packages are installed."
+msgstr "Ní shuiteáiltear ach pacáistí cosúil le pacáistí bonn, base-devel, linux, linux-firmware, efibootmgr agus próifíl roghnach."
+
+#, fuzzy
+msgid "Select zram compression algorithm:"
+msgstr "Roghnaigh pointe gléasta :"
+
+msgid "Use Network Manager (default backend)"
+msgstr ""
+
+msgid "Use Network Manager (iwd backend)"
+msgstr ""
+
+msgid "Firewall"
+msgstr ""
+
+#, fuzzy
+msgid "Additional fonts"
+msgstr "Taisclanna roghnacha"
+
+#, fuzzy
+msgid "Select font packages to install"
+msgstr "Roghnaigh cé acu beannaitheoir atá le suiteáil"
+
+msgid "Unicode font coverage for most languages"
+msgstr ""
+
+msgid "color emoji for browsers and apps"
+msgstr ""
+
+msgid "Chinese, Japanese, Korean characters"
+msgstr ""
+
+#, fuzzy
+msgid "Select audio configuration"
+msgstr "Sábháil cumraíocht úsáideora"
+
+#, fuzzy
+msgid "Enter credentials file decryption password"
+msgstr "Pasfhocal criptithe"
+
+#, fuzzy
+msgid "Enter root password"
+msgstr "Iontráil pasfhocal: "
+
+msgid "Select bootloader to install"
+msgstr ""
+
+#, fuzzy
+msgid "Configuration preview"
+msgstr "Cumraíocht"
+
+#, fuzzy
+msgid "Enter a directory for the configuration(s) to be saved"
+msgstr "Cuir isteach eolaire don chumraíocht(s) atá le sábháil: "
+
+#, fuzzy
+msgid "Select encryption type"
+msgstr "Cineál criptithe"
+
+#, fuzzy
+msgid "Select disks for the installation"
+msgstr "An t-óstainm inmhianaithe don suiteáil: "
+
+#, fuzzy
+msgid "Enter a mountpoint"
+msgstr "Roghnaigh pointe gléasta :"
+
+#, fuzzy, python-brace-format
+msgid "Enter a size (default: {}): "
+msgstr "Cuir isteach an deireadh (réamhshocraithe: {}): "
+
+#, fuzzy
+msgid "Enter subvolume name"
+msgstr "Ainm fo-imleabhar "
+
+#, fuzzy
+msgid "Enter subvolume mountpoint"
+msgstr "Pointe sléibhe subvolume"
+
+#, fuzzy
+msgid "Select a disk configuration"
+msgstr "Cumraíocht diosca"
+
+msgid "Enter root mount directory"
+msgstr ""
+
+msgid "You will use whatever drive-setup is mounted at the specified directory"
+msgstr ""
+
+msgid "WARNING: Archinstall won't check the suitability of this setup"
+msgstr ""
+
+#, fuzzy
+msgid "Select main filesystem"
+msgstr "Athraigh córas comhaid"
+
+msgid "Enter a hostname"
+msgstr ""
+
+#, fuzzy
+msgid "Select timezone"
+msgstr "Roghnaigh crios ama"
+
+#, fuzzy
+msgid "Enter the number of parallel downloads to be enabled"
+msgstr ""
+"Cuir isteach líon na n-íoslódálacha comhthreomhara atá le cumasú.\n"
+"\n"
+"Nóta:\n"
+
+#, python-brace-format
+msgid "Value must be between 1 and {}"
+msgstr ""
+
+#, fuzzy
+msgid "Select which kernel(s) to install"
+msgstr "Roghnaigh cé acu beannaitheoir atá le suiteáil"
+
+#, fuzzy
+msgid "Enter a respository name"
+msgstr "Réigiún scáthán"
+
+#, fuzzy
+msgid "Enter the repository url"
+msgstr "Athraigh scáthán saincheaptha"
+
+msgid "Enter server url"
+msgstr ""
+
+#, fuzzy
+msgid "Select mirror regions to be enabled"
+msgstr "Réigiúin scátháin"
+
+#, fuzzy
+msgid "Select optional repositories to be enabled"
+msgstr "Roghnaigh na stórtha breise roghnacha le cumasú"
+
+#, fuzzy
+msgid "Select an interface"
+msgstr "Scrios comhéadan"
+
+#, fuzzy
+msgid "Choose network configuration"
+msgstr "Gan cumraíocht líonra"
+
+#, fuzzy
+msgid "No packages found"
+msgstr "Comhéadain {} cumraithe"
+
+#, fuzzy
+msgid "Select which greeter to install"
+msgstr "Roghnaigh cé acu beannaitheoir atá le suiteáil"
+
+#, fuzzy
+msgid "Select a profile type"
+msgstr "Próifílí roghnaithe: "
+
+#, fuzzy
+msgid "Enter new password"
+msgstr "Iontráil pasfhocal: "
+
+msgid "Enter a username"
+msgstr ""
+
+#, fuzzy
+msgid "Enter a password"
+msgstr "Iontráil pasfhocal: "
+
+msgid "The password did not match, please try again"
+msgstr ""
+
+msgid "Password strength: Weak"
+msgstr ""
+
+msgid "Password strength: Moderate"
+msgstr ""
+
+msgid "Password strength: Strong"
+msgstr ""
+
+msgid "The selected desktop profile requires a regular user to log in via the greeter"
+msgstr ""
+
+#, fuzzy, python-brace-format
+msgid "Environment type: {} {}"
+msgstr "Cineál timpeallachta: {}"
+
+msgid "Input cannot be empty"
+msgstr ""
+
+msgid "Recommended"
+msgstr ""
+
+msgid "Package"
+msgstr ""
+
+msgid "Curated selection of KDE Plasma packages"
+msgstr ""
+
+msgid "Dependencies"
+msgstr ""
+
+#, fuzzy
+msgid "Package group"
+msgstr "Comhéadain {} cumraithe"
+
+msgid "Extensive KDE Plasma installation"
+msgstr ""
+
+msgid "Packages in group"
+msgstr ""
+
+msgid "Minimal KDE Plasma installation"
+msgstr ""
+
+#, fuzzy
+msgid "Description"
+msgstr "Criptiú diosca"
+
+#, fuzzy
+msgid "Select a flavor of KDE Plasma to install"
+msgstr "Roghnaigh cé acu beannaitheoir atá le suiteáil"
+
+msgid "Arial/Times/Courier replacement, Cyrillic support for Steam/games"
+msgstr ""
+
+msgid "wide Unicode coverage, good fallback font"
 msgstr ""

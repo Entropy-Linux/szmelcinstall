@@ -1,11 +1,6 @@
-from .application import (
-	ApplicationConfiguration,
-	Audio,
-	AudioConfiguration,
-	BluetoothConfiguration,
-)
-from .bootloader import Bootloader
-from .device import (
+from archinstall.lib.models.application import ApplicationConfiguration, Audio, AudioConfiguration, BluetoothConfiguration, PrintServiceConfiguration
+from archinstall.lib.models.bootloader import Bootloader
+from archinstall.lib.models.device import (
 	BDevice,
 	DeviceGeometry,
 	DeviceModification,
@@ -20,7 +15,6 @@ from .device import (
 	LvmLayoutType,
 	LvmVolume,
 	LvmVolumeGroup,
-	LvmVolumeStatus,
 	ModificationStatus,
 	PartitionFlag,
 	PartitionModification,
@@ -32,12 +26,12 @@ from .device import (
 	Unit,
 	_DeviceInfo,
 )
-from .locale import LocaleConfiguration
-from .mirrors import CustomRepository, MirrorConfiguration, MirrorRegion
-from .network import NetworkConfiguration, Nic, NicType
-from .packages import LocalPackage, PackageSearch, PackageSearchResult, Repository
-from .profile import ProfileConfiguration
-from .users import PasswordStrength, User
+from archinstall.lib.models.locale import LocaleConfiguration
+from archinstall.lib.models.mirrors import CustomRepository, MirrorConfiguration, MirrorRegion
+from archinstall.lib.models.network import NetworkConfiguration, Nic, NicType
+from archinstall.lib.models.packages import LocalPackage, PackageSearch, PackageSearchResult, Repository
+from archinstall.lib.models.profile import ProfileConfiguration
+from archinstall.lib.models.users import PasswordStrength, User
 
 __all__ = [
 	'ApplicationConfiguration',
@@ -62,7 +56,6 @@ __all__ = [
 	'LvmLayoutType',
 	'LvmVolume',
 	'LvmVolumeGroup',
-	'LvmVolumeStatus',
 	'MirrorConfiguration',
 	'MirrorRegion',
 	'ModificationStatus',
@@ -76,6 +69,7 @@ __all__ = [
 	'PartitionTable',
 	'PartitionType',
 	'PasswordStrength',
+	'PrintServiceConfiguration',
 	'ProfileConfiguration',
 	'Repository',
 	'SectorSize',

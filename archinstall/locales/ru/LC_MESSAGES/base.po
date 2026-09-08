@@ -54,6 +54,9 @@ msgstr "Выберите звуковой сервер"
 msgid "Only packages such as base, base-devel, linux, linux-firmware, efibootmgr and optional profile packages are installed."
 msgstr "Устанавливаются только такие пакеты, как base, base-devel, linux, linux-firmware, efibootmgr и дополнительные пакеты профиля."
 
+msgid "Note: base-devel is no longer installed by default. Add it here if you need build tools."
+msgstr "Примечание: base-devel больше не устанавливается по умолчанию. Добавьте его здесь, если вам нужны инструменты сборки."
+
 msgid "If you desire a web browser, such as firefox or chromium, you may specify it in the following prompt."
 msgstr "Если вы хотите использовать веб-браузер, например, firefox или chromium, вы можете указать его в следующем запросе."
 
@@ -948,28 +951,28 @@ msgid "Encryption type"
 msgstr "Тип шифрования"
 
 msgid "Iteration time"
-msgstr ""
+msgstr "Время итерации"
 
 msgid "Enter iteration time for LUKS encryption (in milliseconds)"
-msgstr ""
+msgstr "Введите время итерации для шифрования LUKS (в миллисекундах)"
 
 msgid "Higher values increase security but slow down boot time"
-msgstr ""
+msgstr "Большие значения повышают безопасность, но замедляют время загрузки"
 
 msgid "Default: 10000ms, Recommended range: 1000-60000"
-msgstr ""
+msgstr "По умолчанию: 10000 мс, рекомендуемый диапазон: 1000-60000"
 
 msgid "Iteration time cannot be empty"
-msgstr ""
+msgstr "Время итерации не может быть пустым"
 
 msgid "Iteration time must be at least 100ms"
-msgstr ""
+msgstr "Время итерации должно быть не менее 100 мс"
 
 msgid "Iteration time must be at most 120000ms"
-msgstr ""
+msgstr "Время итерации должно быть не более 120000 мс"
 
 msgid "Please enter a valid number"
-msgstr ""
+msgstr "Пожалуйста, введите корректное число"
 
 msgid "Partitions"
 msgstr "Разделы"
@@ -1548,7 +1551,7 @@ msgid "The specified configuration will be applied"
 msgstr "Будет применена указанная конфигурация"
 
 msgid "Wipe"
-msgstr ""
+msgstr "Стереть"
 
 #, fuzzy
 msgid "Mark/Unmark as XBOOTLDR"
@@ -1559,7 +1562,7 @@ msgid "Loading packages..."
 msgstr "Дополнительные пакеты"
 
 msgid "Select any packages from the below list that should be installed additionally"
-msgstr ""
+msgstr "Выберите любые пакеты из приведенного ниже списка, которые следует установить дополнительно"
 
 #, fuzzy
 msgid "Add a custom repository"
@@ -1590,7 +1593,7 @@ msgid "Delete custom server"
 msgstr "Удалить пользовательское зеркало"
 
 msgid "Server url"
-msgstr ""
+msgstr "URL сервера"
 
 #, fuzzy
 msgid "Select regions"
@@ -1625,40 +1628,40 @@ msgid "Custom repositories"
 msgstr "Дополнительные репозитории"
 
 msgid "Only ASCII characters are supported"
-msgstr ""
+msgstr "Поддерживаются только символы ASCII"
 
 msgid "Show help"
-msgstr ""
+msgstr "Показать справку"
 
 msgid "Exit help"
-msgstr ""
+msgstr "Выйти из справки"
 
 msgid "Preview scroll up"
-msgstr ""
+msgstr "Просмотр вверх"
 
 msgid "Preview scroll down"
-msgstr ""
+msgstr "Просмотр вниз"
 
 msgid "Move up"
-msgstr ""
+msgstr "Переместить вверх"
 
 msgid "Move down"
-msgstr ""
+msgstr "Переместить вниз"
 
 msgid "Move right"
-msgstr ""
+msgstr "Переместить вправо"
 
 msgid "Move left"
-msgstr ""
+msgstr "Переместить влево"
 
 msgid "Jump to entry"
-msgstr ""
+msgstr "Перейти к записи"
 
 msgid "Skip selection (if available)"
-msgstr ""
+msgstr "Пропустить выбор (если доступно)"
 
 msgid "Reset selection (if available)"
-msgstr ""
+msgstr "Сбросить выбор (если доступно)"
 
 #, fuzzy
 msgid "Select on single select"
@@ -1669,17 +1672,17 @@ msgid "Select on multi select"
 msgstr "Выберите часовой пояс"
 
 msgid "Reset"
-msgstr ""
+msgstr "Сбросить"
 
 #, fuzzy
 msgid "Skip selection menu"
 msgstr "Выберите режим выполнения"
 
 msgid "Start search mode"
-msgstr ""
+msgstr "Запустить режим поиска"
 
 msgid "Exit search mode"
-msgstr ""
+msgstr "Выйти из режима поиска"
 
 #, fuzzy
 msgid "labwc needs access to your seat (collection of hardware devices i.e. keyboard, mouse, etc)"
@@ -1760,52 +1763,63 @@ msgid "Passwordless login"
 msgstr "Пароль"
 
 msgid "Second factor login"
-msgstr ""
+msgstr "Двухфакторная аутентификация"
 
 msgid "Bluetooth"
-msgstr ""
+msgstr "Bluetooth"
 
 #, fuzzy
 msgid "Would you like to configure Bluetooth?"
 msgstr "Вы хотите продолжить?"
 
+msgid "Print service"
+msgstr "Служба печати"
+
+#, fuzzy
+msgid "Would you like to configure the print service?"
+msgstr "Вы хотите продолжить?"
+
+#, fuzzy
+msgid "Power management"
+msgstr "Управление питанием"
+
 msgid "Authentication"
-msgstr ""
+msgstr "Аутентификация"
 
 msgid "Applications"
-msgstr ""
+msgstr "Приложения"
 
 msgid "U2F login method: "
-msgstr ""
+msgstr "Метод входа U2F: "
 
 msgid "Passwordless sudo: "
-msgstr ""
+msgstr "Sudo без пароля: "
 
 #, python-brace-format
 msgid "Btrfs snapshot type: {}"
-msgstr ""
+msgstr "Тип снимка Btrfs: {}"
 
 msgid "Syncing the system..."
-msgstr ""
+msgstr "Синхронизация системы..."
 
 msgid "Value cannot be empty"
-msgstr ""
+msgstr "Значение не может быть пустым"
 
 msgid "Snapshot type"
-msgstr ""
+msgstr "Тип снимка"
 
 #, fuzzy, python-brace-format
 msgid "Snapshot type: {}"
-msgstr "Тип окружения рабочего стола: {}"
+msgstr "Тип снимка: {}"
 
 msgid "U2F login setup"
-msgstr ""
+msgstr "Настройка U2F входа"
 
 msgid "No U2F devices found"
-msgstr ""
+msgstr "Устройства U2F не найдены"
 
 msgid "U2F Login Method"
-msgstr ""
+msgstr "Метод входа U2F"
 
 #, fuzzy
 msgid "Enable passwordless sudo?"
@@ -1816,10 +1830,10 @@ msgid "Setting up U2F device for user: {}"
 msgstr "Выберите устройство FIDO2 для использования в качестве HSM"
 
 msgid "You may need to enter the PIN and then touch your U2F device to register it"
-msgstr ""
+msgstr "Вам может потребоваться ввести PIN и затем коснуться устройства U2F для регистрации"
 
 msgid "Starting device modifications in "
-msgstr ""
+msgstr "Начало изменения устройства через "
 
 #, fuzzy
 msgid "No network connection found"
@@ -1838,45 +1852,78 @@ msgid "Select wifi network to connect to"
 msgstr "Выберите один сетевой интерфейс для настройки"
 
 msgid "Scanning wifi networks..."
-msgstr ""
+msgstr "Сканирование Wi-Fi сетей..."
 
 #, fuzzy
 msgid "No wifi networks found"
 msgstr "Нет сетевой конфигурации"
 
 msgid "Failed setting up wifi"
-msgstr ""
+msgstr "Не удалось настроить Wi-Fi"
 
 #, fuzzy
 msgid "Enter wifi password"
 msgstr "Введите пароль: "
 
 msgid "Ok"
-msgstr ""
+msgstr "Ок"
 
 msgid "Removable"
-msgstr ""
+msgstr "Съемный"
 
 msgid "Install to removable location"
-msgstr ""
+msgstr "Установить в съемное расположение"
 
 msgid "Will install to /EFI/BOOT/ (removable location)"
-msgstr ""
+msgstr "Будет установлено в /EFI/BOOT/ (съемное расположение)"
 
 msgid "Will install to standard location with NVRAM entry"
-msgstr ""
+msgstr "Будет установлено в стандартное расположение с записью NVRAM"
 
 msgid "Would you like to install the bootloader to the default removable media search location?"
-msgstr ""
+msgstr "Вы хотите установить загрузчик в стандартное место поиска съемных носителей?"
 
 msgid "This installs the bootloader to /EFI/BOOT/BOOTX64.EFI (or similar) which is useful for:"
-msgstr ""
+msgstr "Это устанавливает загрузчик в /EFI/BOOT/BOOTX64.EFI (или подобное), что полезно для:"
 
 msgid "USB drives or other portable external media."
-msgstr ""
+msgstr "USB-накопители или другие портативные внешние носители."
 
 msgid "Systems where you want the disk to be bootable on any computer."
-msgstr ""
+msgstr "Системы, где вы хотите, чтобы диск был загрузочным на любом компьютере."
 
 msgid "Firmware that does not properly support NVRAM boot entries."
-msgstr ""
+msgstr "Прошивка, которая некорректно поддерживает загрузочные записи NVRAM."
+
+msgid "Will install to /EFI/BOOT/ (removable location, safe default)"
+msgstr "Будет установлено в /EFI/BOOT/ (съемное расположение, безопасный вариант)"
+
+msgid "Will install to custom location with NVRAM entry"
+msgstr "Будет установлено в пользовательское место с записью NVRAM"
+
+msgid "Firmware that does not properly support NVRAM boot entries like most MSI motherboards,"
+msgstr "Прошивка, которая, как у большинства материнских плат MSI, не поддерживает корректно загрузочные записи NVRAM,"
+
+msgid "most Apple Macs, many laptops..."
+msgstr "большинство Apple Mac и многих ноутбуков..."
+
+#, fuzzy
+msgid "Language"
+msgstr "Язык локали"
+
+msgid "Compression algorithm"
+msgstr "Алгоритм сжатия"
+
+#, fuzzy
+msgid "Only packages such as base, sudo, linux, linux-firmware, efibootmgr and optional profile packages are installed."
+msgstr "Устанавливаются только такие пакеты, как base, base-devel, linux, linux-firmware, efibootmgr и дополнительные пакеты профиля."
+
+#, fuzzy
+msgid "Select zram compression algorithm:"
+msgstr "Выберите алгоритм сжатия zram:"
+
+msgid "Use Network Manager (default backend)"
+msgstr "Использовать NetworkManager (основной бэкенд)"
+
+msgid "Use Network Manager (iwd backend)"
+msgstr "Использовать NetworkManager (бэкенд iwd)"

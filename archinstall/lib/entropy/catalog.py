@@ -1,12 +1,9 @@
-from __future__ import annotations
-
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable
 
-from archinstall.lib.output import debug, warn
-
+from archinstall.lib.log import debug, warn
 
 BASE_PATH = Path(__file__).resolve().parents[2] / 'config' / 'entropy'
 FILES_PATH = BASE_PATH / 'files'
@@ -59,10 +56,18 @@ def _resolve_src(meta_path: Path, src: str) -> Path:
 	if src_path.is_absolute():
 		return src_path
 
-	# prefer alongside the metadata file, then fall back to global files/ tree
-	local = meta_path.parent / src_path
-	if local.exists():
-		return local
+	# Prefer a path next to the metadata file, then one relative to the entropy
+	# config root (the JSON definitions spell these as 'files/...'), and finally
+	# one relative to the files/ tree itself.
+	candidates = [
+		meta_path.parent / src_path,
+		BASE_PATH / src_path,
+		FILES_PATH / src_path,
+	]
+
+	for candidate in candidates:
+		if candidate.exists():
+			return candidate
 
 	return FILES_PATH / src_path
 

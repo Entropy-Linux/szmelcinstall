@@ -1,64 +1,158 @@
 import os
-from pathlib import Path
-
-from archinstall import SysInfo
-from archinstall.lib.applications.application_handler import application_handler
-from archinstall.lib.args import arch_config_handler
-from archinstall.lib.authentication.authentication_handler import auth_handler
-from archinstall.lib.configuration import ConfigurationOutput
-from archinstall.lib.disk.filesystem import FilesystemHandler
-from archinstall.lib.disk.utils import disk_layouts
-from archinstall.lib.global_menu import GlobalMenu
-from archinstall.lib.installer import Installer, accessibility_tools_in_use, run_custom_user_commands
-from archinstall.lib.interactions.general_conf import PostInstallationAction, ask_post_installation
-from archinstall.lib.models import Bootloader
-from archinstall.lib.entropy import apply_payload, payload_from_config
-from archinstall.lib.models.device import (
-	DiskLayoutType,
-	EncryptionType,
-)
-from archinstall.lib.models.mirrors import CustomRepository, MirrorConfiguration, SignCheck, SignOption
-from archinstall.lib.models.users import User
-from archinstall.lib.output import debug, error, info
-from archinstall.lib.packages.packages import check_package_upgrade
-from archinstall.lib.profile.profiles_handler import profile_handler
-from archinstall.lib.translationhandler import tr
-from archinstall.tui import Tui
 import re
 import subprocess
+import sys
+import time
+from pathlib import Path
+
+from archinstall.lib.applications.application_handler import ApplicationHandler
+from archinstall.lib.args import ArchConfig, ArchConfigHandler
+from archinstall.lib.authentication.authentication_handler import AuthenticationHandler
+from archinstall.lib.bootloader.utils import validate_bootloader_layout
+from archinstall.lib.configuration import confirm_config
+from archinstall.lib.disk.filesystem import FilesystemHandler
+from archinstall.lib.disk.utils import disk_layouts
+from archinstall.lib.entropy import apply_payload, payload_from_config
+from archinstall.lib.exceptions import RequirementError
+from archinstall.lib.general.general_menu import PostInstallationAction, select_post_installation
+from archinstall.lib.global_menu import GlobalMenu
+from archinstall.lib.installer import Installer, accessibility_tools_in_use, run_custom_user_commands
+from archinstall.lib.log import debug, error, info
+from archinstall.lib.menu.util import delayed_warning
+from archinstall.lib.mirror.mirror_handler import MirrorListHandler
+from archinstall.lib.models import Bootloader
+from archinstall.lib.models.device import DiskLayoutType, EncryptionType
+from archinstall.lib.models.mirrors import CustomRepository, MirrorConfiguration, SignCheck, SignOption
+from archinstall.lib.models.users import User
+from archinstall.lib.network.network_handler import install_network_config
+from archinstall.lib.packages.util import check_version_upgrade
+from archinstall.lib.profile.profiles_handler import profile_handler
+from archinstall.lib.translationhandler import tr
+from archinstall.tui.components import tui
+
+CUSTOM_SCRIPT_STAGES = [
+	'before_initialization',
+	'after_initialization',
+	'before_user_config',
+	'after_user_config',
+	'before_pre_install',
+	'after_pre_install',
+	'before_installation',
+	'after_installation',
+	'before_post_install',
+	'after_post_install',
+]
 
 
-def ask_user_questions() -> None:
-	"""
-	First, we'll ask the user for a bunch of user input.
-	Not until we're satisfied with what we want to install
-	will we continue with the actual installation steps.
-	"""
+def _parse_custom_script(script_path: Path) -> dict[str, list[str]]:
+	"""Split custom.sh into per-stage command lists, keyed by leading `# <n>` markers."""
+	stage_cmds: dict[str, list[str]] = {name: [] for name in CUSTOM_SCRIPT_STAGES}
+	stage_map = {idx + 1: name for idx, name in enumerate(CUSTOM_SCRIPT_STAGES)}
+	current_stage: str | None = None
 
-	title_text = None
+	for raw in script_path.read_text().splitlines():
+		line = raw.rstrip('\n')
 
-	upgrade = check_package_upgrade('archinstall')
+		if not line.strip():
+			continue
+
+		if line.startswith('#'):
+			if m := re.match(r'#\s*(\d+)\b', line):
+				current_stage = stage_map.get(int(m.group(1)))
+			continue
+
+		if current_stage is None:
+			continue
+
+		stage_cmds[current_stage].append(line)
+
+	return stage_cmds
+
+
+def run_custom_stage(config: ArchConfig, stage: str) -> None:
+	"""Run the custom.sh commands registered for `stage`, when the feature is enabled."""
+	if not config.custom_script or stage not in CUSTOM_SCRIPT_STAGES:
+		return
+
+	path = Path(__file__).resolve().parent.parent / 'custom.sh'
+	if not path.exists():
+		return
+
+	cmds = _parse_custom_script(path).get(stage, [])
+	if not cmds:
+		return
+
+	env = os.environ.copy()
+	env['stage'] = stage
+
+	info(f'Running custom.sh for stage: {stage}')
+	try:
+		_ = subprocess.run(['/bin/sh', '-c', '\n'.join(cmds)], check=True, env=env)
+	except subprocess.CalledProcessError as err:
+		raise RequirementError(f'custom.sh failed at stage {stage}: {err}') from err
+
+
+def configure_szmelc_repository(config: ArchConfig) -> None:
+	"""Add or remove the Szmelc custom repository according to the config toggle."""
+	if config.mirror_config is None:
+		config.mirror_config = MirrorConfiguration()
+
+	repos = config.mirror_config.custom_repositories
+
+	if not config.szmelc_aur:
+		config.mirror_config.custom_repositories = [repo for repo in repos if repo.name != 'szmelc']
+		return
+
+	if not any(repo.name == 'szmelc' for repo in repos):
+		repos.append(
+			CustomRepository(
+				name='szmelc',
+				url='https://packages.szmelc.com/x86_64',
+				sign_check=SignCheck.Optional,
+				sign_option=SignOption.TrustAll,
+			),
+		)
+
+
+def show_menu(
+	arch_config_handler: ArchConfigHandler,
+	mirror_list_handler: MirrorListHandler,
+) -> None:
+	upgrade = check_version_upgrade()
+	title_text = 'Entropy Linux'
+
 	if upgrade:
 		text = tr('New version available') + f': {upgrade}'
-		title_text = text
+		title_text += f' ({text})'
 
-	with Tui():
-		global_menu = GlobalMenu(arch_config_handler.config)
+	global_menu = GlobalMenu(
+		arch_config_handler.config,
+		mirror_list_handler,
+		arch_config_handler.args.skip_boot,
+		advanced=arch_config_handler.args.advanced,
+		title=title_text,
+	)
 
-		if not arch_config_handler.args.advanced:
-			global_menu.set_enabled('parallel_downloads', False)
+	result: ArchConfig | None = tui.run(global_menu)
+	if result is None:
+		sys.exit(0)
 
-		global_menu.run(additional_title=title_text)
 
-
-def perform_installation(mountpoint: Path) -> None:
+def perform_installation(
+	arch_config_handler: ArchConfigHandler,
+	mirror_list_handler: MirrorListHandler,
+	auth_handler: AuthenticationHandler,
+	application_handler: ApplicationHandler,
+) -> None:
 	"""
 	Performs the installation steps on a block device.
 	Only requirement is that the block devices are
 	formatted and setup prior to entering this function.
 	"""
+	start_time = time.monotonic()
 	info('Starting installation...')
 
+	mountpoint = arch_config_handler.args.mountpoint
 	config = arch_config_handler.config
 
 	if not config.disk_config:
@@ -71,166 +165,89 @@ def perform_installation(mountpoint: Path) -> None:
 	optional_repositories = config.mirror_config.optional_repositories if config.mirror_config else []
 	mountpoint = disk_config.mountpoint if disk_config.mountpoint else mountpoint
 
-	def run_custom_stage(stage: str) -> None:
-		if not getattr(config, 'custom_script', False):
-			return
-
-		path = Path(__file__).resolve().parent.parent / 'custom.sh'
-		if not path.exists():
-			return
-
-		stages = [
-			'before_initialization',
-			'after_initialization',
-			'before_user_config',
-			'after_user_config',
-			'before_pre_install',
-			'after_pre_install',
-			'before_installation',
-			'after_installation',
-			'before_post_install',
-			'after_post_install',
-		]
-
-		stage_map = {idx + 1: name for idx, name in enumerate(stages)}
-
-		def parse_script(script_path: Path) -> dict[str, list[str]]:
-			stage_cmds: dict[str, list[str]] = {name: [] for name in stages}
-			current_stage: str | None = None
-
-			for raw in script_path.read_text().splitlines():
-				line = raw.rstrip('\n')
-
-				if not line.strip():
-					continue
-
-				if line.startswith('#'):
-					m = re.match(r'#\s*(\d+)\b', line)
-					if m:
-						idx = int(m.group(1))
-						current_stage = stage_map.get(idx)
-					else:
-						continue
-					continue
-
-				if current_stage is None:
-					continue
-
-				stage_cmds[current_stage].append(line)
-
-			return stage_cmds
-
-		if stage not in stages:
-			return
-
-		cmds = parse_script(path).get(stage, [])
-		if not cmds:
-			return
-
-		script = '\n'.join(cmds)
-
-		env = os.environ.copy()
-		env['stage'] = stage
-
-		info(f'Running custom.sh for stage: {stage}')
-		try:
-			subprocess.run(['/bin/sh', '-c', script], check=True, env=env)
-		except subprocess.CalledProcessError as err:
-			raise RequirementError(f'custom.sh failed at stage {stage}: {err}') from err
-
-	if config.mirror_config is None:
-		config.mirror_config = MirrorConfiguration()
-
-	if config.szmelc_aur:
-		if not any(repo.name == 'szmelc' for repo in config.mirror_config.custom_repositories):
-			config.mirror_config.custom_repositories.append(
-				CustomRepository(
-					name='szmelc',
-					url='https://packages.szmelc.com/x86_64',
-					sign_check=SignCheck.Optional,
-					sign_option=SignOption.TrustAll,
-				),
-			)
-	else:
-		config.mirror_config.custom_repositories = [
-			repo for repo in config.mirror_config.custom_repositories if repo.name != 'szmelc'
-		]
-
-	run_custom_stage('before_initialization')
+	configure_szmelc_repository(config)
+	run_custom_stage(config, 'before_initialization')
 
 	with Installer(
 		mountpoint,
 		disk_config,
 		kernels=config.kernels,
+		silent=arch_config_handler.args.silent,
 	) as installation:
-		run_custom_stage('after_initialization')
+		run_custom_stage(config, 'after_initialization')
+
 		# Mount all the drives to the desired mountpoint
 		if disk_config.config_type != DiskLayoutType.Pre_mount:
 			installation.mount_ordered_layout()
 
-		installation.sanity_check()
+		installation.sanity_check(
+			arch_config_handler.args.offline,
+			arch_config_handler.args.skip_ntp,
+			arch_config_handler.args.skip_wkd,
+		)
 
 		if disk_config.config_type != DiskLayoutType.Pre_mount:
-			if disk_config.disk_encryption and disk_config.disk_encryption.encryption_type != EncryptionType.NoEncryption:
+			if disk_config.disk_encryption and disk_config.disk_encryption.encryption_type != EncryptionType.NO_ENCRYPTION:
 				# generate encryption key files for the mounted luks devices
 				installation.generate_key_files()
 
 		if mirror_config := config.mirror_config:
-			installation.set_mirrors(mirror_config, on_target=False)
+			installation.set_mirrors(mirror_list_handler, mirror_config, on_target=False)
 
-		run_custom_stage('before_pre_install')
+		run_custom_stage(config, 'before_pre_install')
 
 		installation.minimal_installation(
 			optional_repositories=optional_repositories,
 			mkinitcpio=run_mkinitcpio,
 			hostname=arch_config_handler.config.hostname,
 			locale_config=locale_config,
+			pacman_config=config.pacman_config,
 		)
 
 		if mirror_config := config.mirror_config:
-			installation.set_mirrors(mirror_config, on_target=True)
+			installation.set_mirrors(mirror_list_handler, mirror_config, on_target=True)
 
-		run_custom_stage('after_pre_install')
+		run_custom_stage(config, 'after_pre_install')
 
 		if config.chaotic_aur:
 			installation.add_chaotic_aur()
 
-		if config.swap:
-			installation.setup_swap('zram')
+		if config.swap and config.swap.enabled:
+			installation.setup_swap(algo=config.swap.algorithm)
 
 		if config.bootloader_config and config.bootloader_config.bootloader != Bootloader.NO_BOOTLOADER:
-			if config.bootloader_config.bootloader == Bootloader.Grub and SysInfo.has_uefi():
-				installation.add_additional_packages('grub')
+			installation.add_bootloader(
+				config.bootloader_config.bootloader,
+				config.bootloader_config.uki,
+				config.bootloader_config.removable,
+				config.bootloader_config.plymouth,
+			)
 
-			installation.add_bootloader(config.bootloader_config.bootloader, config.bootloader_config.uki, config.bootloader_config.removable)
-
-		# If user selected to copy the current ISO network configuration
-		# Perform a copy of the config
-		network_config = config.network_config
-
-		if network_config:
-			network_config.install_network_config(
+		if config.network_config:
+			install_network_config(
+				config.network_config,
 				installation,
 				config.profile_config,
 			)
 
-		run_custom_stage('before_user_config')
+		run_custom_stage(config, 'before_user_config')
 
+		users = None
 		if config.auth_config:
 			if config.auth_config.users:
+				users = config.auth_config.users
 				installation.create_users(config.auth_config.users)
 				auth_handler.setup_auth(installation, config.auth_config, config.hostname)
 
-		run_custom_stage('after_user_config')
+		run_custom_stage(config, 'after_user_config')
 
 		if config.install_from_iso:
-			users = config.auth_config.users if config.auth_config and config.auth_config.users else []
-			installation.apply_install_from_iso(users)
+			installation.apply_install_from_iso(users or [], config.install_from_iso_mode)
 
-		run_custom_stage('before_installation')
+		run_custom_stage(config, 'before_installation')
 
-		if config.install_yay and config.auth_config and config.auth_config.users:
-			installation.install_yay(config.auth_config.users)
+		if config.install_yay and users:
+			installation.install_yay(users)
 
 		if app_config := config.app_config:
 			application_handler.install_applications(installation, app_config)
@@ -261,14 +278,17 @@ def perform_installation(mountpoint: Path) -> None:
 		if (profile_config := config.profile_config) and profile_config.profile:
 			profile_config.profile.post_install(installation)
 
-		run_custom_stage('after_installation')
+			if users:
+				profile_config.profile.provision(installation, users)
+
+		run_custom_stage(config, 'after_installation')
 
 		# If the user provided a list of services to be enabled, pass the list to the enable_service function.
 		# Note that while it's called enable_service, it can actually take a list of services and iterate it.
-		if servies := config.services:
-			installation.enable_service(servies)
+		if services := config.services:
+			installation.enable_service(services)
 
-		run_custom_stage('before_post_install')
+		run_custom_stage(config, 'before_post_install')
 
 		if disk_config.has_default_btrfs_vols():
 			btrfs_options = disk_config.btrfs_options
@@ -284,19 +304,19 @@ def perform_installation(mountpoint: Path) -> None:
 
 		installation.genfstab()
 
-		run_custom_stage('after_post_install')
+		run_custom_stage(config, 'after_post_install')
 
 		debug(f'Disk states after installing:\n{disk_layouts()}')
 
 		if not arch_config_handler.args.silent:
-			with Tui():
-				action = ask_post_installation()
+			elapsed_time = time.monotonic() - start_time
+			action: PostInstallationAction = tui.run(lambda: select_post_installation(elapsed_time))
 
 			match action:
 				case PostInstallationAction.EXIT:
 					pass
 				case PostInstallationAction.REBOOT:
-					os.system('reboot')
+					_ = os.system('reboot')  # type: ignore[deprecated]
 				case PostInstallationAction.CHROOT:
 					try:
 						installation.drop_to_shell()
@@ -304,32 +324,59 @@ def perform_installation(mountpoint: Path) -> None:
 						pass
 
 
-def guided() -> None:
-	if not arch_config_handler.args.silent:
-		ask_user_questions()
+def main(arch_config_handler: ArchConfigHandler | None = None) -> None:
+	if arch_config_handler is None:
+		arch_config_handler = ArchConfigHandler()
 
-	config = ConfigurationOutput(arch_config_handler.config)
-	config.write_debug()
-	config.save()
+	mirror_list_handler = MirrorListHandler(
+		offline=arch_config_handler.args.offline,
+		verbose=arch_config_handler.args.verbose,
+	)
+
+	if not arch_config_handler.args.silent:
+		show_menu(arch_config_handler, mirror_list_handler)
+
+	arch_config_handler.config.write_debug()
+	arch_config_handler.config.save()
+
+	# Safety net for silent/config-file flow. The TUI menu blocks Install via
+	# GlobalMenu._validate_bootloader() before reaching this point.
+	if failure := validate_bootloader_layout(
+		arch_config_handler.config.bootloader_config,
+		arch_config_handler.config.disk_config,
+	):
+		error(failure.description)
+		return
 
 	if arch_config_handler.args.dry_run:
-		exit(0)
+		return
 
 	if not arch_config_handler.args.silent:
 		aborted = False
-		with Tui():
-			if not config.confirm_config():
-				debug('Installation aborted')
-				aborted = True
+		res: bool = tui.run(lambda: confirm_config(arch_config_handler.config))
+
+		if not res:
+			debug('Installation aborted')
+			aborted = True
 
 		if aborted:
-			return guided()
+			return main(arch_config_handler)
 
 	if arch_config_handler.config.disk_config:
 		fs_handler = FilesystemHandler(arch_config_handler.config.disk_config)
+
+		if not delayed_warning(tr('Starting device modifications in ')):
+			return main()
+
 		fs_handler.perform_filesystem_operations()
 
-	perform_installation(arch_config_handler.args.mountpoint)
+	perform_installation(
+		arch_config_handler,
+		mirror_list_handler,
+		AuthenticationHandler(),
+		ApplicationHandler(),
+	)
 
 
-guided()
+if __name__ == '__main__':
+	main()

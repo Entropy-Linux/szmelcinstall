@@ -1,17 +1,16 @@
-from asyncio import sleep
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, assert_never
+from typing import assert_never, override
 
+from archinstall.lib.command import SysCommand
 from archinstall.lib.exceptions import SysCallError
-from archinstall.lib.general import SysCommand
+from archinstall.lib.log import debug
 from archinstall.lib.models.network import WifiConfiguredNetwork, WifiNetwork
 from archinstall.lib.network.wpa_supplicant import WpaSupplicantConfig
-from archinstall.lib.output import debug
+from archinstall.lib.networking import SYS_NET
 from archinstall.lib.translationhandler import tr
-from archinstall.tui.menu_item import MenuItemGroup
-from archinstall.tui.ui.components import ConfirmationScreen, InputScreen, LoadingScreen, NotifyScreen, TableSelectionScreen, tui
-from archinstall.tui.ui.result import ResultType
+from archinstall.tui.components import ConfirmationScreen, InputScreen, InstanceRunnable, LoadingScreen, NotifyScreen, TableSelectionScreen, tui
+from archinstall.tui.menu_item import MenuItem, MenuItemGroup
+from archinstall.tui.result import Result, ResultType
 
 
 @dataclass
@@ -21,16 +20,12 @@ class WpaCliResult:
 	error: str | None = None
 
 
-class WifiHandler:
+class WifiHandler(InstanceRunnable[bool]):
 	def __init__(self) -> None:
-		tui.set_main(self)
-		self._wpa_config = WpaSupplicantConfig()
+		self._wpa_config: WpaSupplicantConfig = WpaSupplicantConfig()
 
-	def setup(self) -> Any:
-		result = tui.run()
-		return result
-
-	async def run(self) -> None:
+	@override
+	async def run(self) -> bool | None:
 		"""
 		This is the entry point that is called by components.TApp
 		"""
@@ -38,8 +33,7 @@ class WifiHandler:
 
 		if not wifi_iface:
 			debug('No wifi interface found')
-			tui.exit(False)
-			return None
+			return False
 
 		prompt = tr('No network connection found') + '\n\n'
 		prompt += tr('Would you like to connect to a Wifi?') + '\n'
@@ -53,22 +47,18 @@ class WifiHandler:
 
 		match result.type_:
 			case ResultType.Selection:
-				if result.value() is False:
-					tui.exit(False)
-					return None
+				if result.get_value() is False:
+					return False
 			case ResultType.Skip | ResultType.Reset:
-				tui.exit(False)
-				return None
-			case _:
-				assert_never(result)
+				return False
 
 		setup_result = await self._setup_wifi(wifi_iface)
-		tui.exit(setup_result)
+		return setup_result
 
 	async def _enable_supplicant(self, wifi_iface: str) -> bool:
 		self._wpa_config.load_config()
 
-		result = self._wpa_cli('status')  # if it it's running it will blow up
+		result = self._wpa_cli('status')
 
 		if result.success:
 			debug('wpa_supplicant already running')
@@ -82,24 +72,22 @@ class WifiHandler:
 
 		try:
 			SysCommand(f'wpa_supplicant -B -i {wifi_iface} -c {self._wpa_config.config_file}')
-			result = self._wpa_cli('status')  # if it it's running it will blow up
-
-			if result.success:
-				debug('successfully enabled wpa_supplicant')
-				return True
-			else:
-				debug(f'failed to enable wpa_supplicant: {result.error}')
-				return False
 		except SysCallError as err:
 			debug(f'failed to enable wpa_supplicant: {err}')
 			return False
 
-	def _find_wifi_interface(self) -> str | None:
-		net_path = Path('/sys/class/net')
+		result = self._wpa_cli('status')
 
-		for iface in net_path.iterdir():
-			maybe_wireless_path = net_path / iface / 'wireless'
-			if maybe_wireless_path.is_dir():
+		if result.success:
+			debug('successfully enabled wpa_supplicant')
+			return True
+		else:
+			debug(f'failed to enable wpa_supplicant: {result.error}')
+			return False
+
+	def _find_wifi_interface(self) -> str | None:
+		for iface in SYS_NET.iterdir():
+			if (iface / 'wireless').is_dir():
 				return iface.name
 
 		return None
@@ -118,36 +106,28 @@ class WifiHandler:
 
 		debug(f'Found wifi interface: {wifi_iface}')
 
-		async def get_wifi_networks() -> list[WifiNetwork]:
-			debug('Scanning Wifi networks')
-			result = self._wpa_cli('scan', wifi_iface)
+		wifi_networks = await self._scan_wifi(wifi_iface)
 
-			if not result.success:
-				debug(f'Failed to scan wifi networks: {result.error}')
-				return []
+		if not wifi_networks:
+			debug('No networks found')
+			await NotifyScreen(header=tr('No wifi networks found')).run()
+			tui.exit(Result.false())
+			return False
 
-			await sleep(5)
-			return self._get_scan_results(wifi_iface)
+		items = [MenuItem(network.ssid, value=network) for network in wifi_networks]
 
 		result = await TableSelectionScreen[WifiNetwork](
 			header=tr('Select wifi network to connect to'),
-			loading_header=tr('Scanning wifi networks...'),
-			data_callback=get_wifi_networks,
+			group=MenuItemGroup(items),
 			allow_skip=True,
 			allow_reset=True,
 		).run()
 
 		match result.type_:
 			case ResultType.Selection:
-				if not result.has_data():
-					debug('No networks found')
-					await NotifyScreen(header=tr('No wifi networks found')).run()
-					tui.exit(False)
-					return False
-
-				network = result.value()
+				network = result.get_value()
 			case ResultType.Skip | ResultType.Reset:
-				tui.exit(False)
+				tui.exit(Result.false())
 				return False
 			case _:
 				assert_never(result.type_)
@@ -170,7 +150,7 @@ class WifiHandler:
 			await self._notify_failure()
 			return False
 
-		await LoadingScreen(3, 'Setting up wifi...').run()
+		await LoadingScreen(timer=3, header='Setting up wifi...').run()
 
 		network_id = self._find_network_id(network.ssid, wifi_iface)
 
@@ -186,9 +166,21 @@ class WifiHandler:
 			await self._notify_failure()
 			return False
 
-		await LoadingScreen(5, 'Connecting wifi...').run()
+		await LoadingScreen(timer=5, header='Connecting wifi...').run()
 
 		return True
+
+	async def _scan_wifi(self, wifi_iface: str) -> list[WifiNetwork]:
+		debug('Scanning Wifi networks')
+		scan_result = self._wpa_cli('scan', wifi_iface)
+
+		if not scan_result.success:
+			debug(f'Failed to scan wifi networks: {scan_result.error}')
+			return []
+
+		await LoadingScreen(timer=5, header=tr('Scanning wifi networks...')).run()
+
+		return self._get_scan_results(wifi_iface)
 
 	async def _notify_failure(self) -> None:
 		await NotifyScreen(header=tr('Failed setting up wifi')).run()
@@ -203,21 +195,21 @@ class WifiHandler:
 
 		try:
 			result = SysCommand(cmd).decode()
-
-			if 'FAIL' in result:
-				debug(f'wpa_cli returned FAIL: {result}')
-				return WpaCliResult(
-					success=False,
-					error=f'wpa_cli returned a failure: {result}',
-				)
-
-			return WpaCliResult(success=True, response=result)
 		except SysCallError as err:
 			debug(f'error running wpa_cli command: {err}')
 			return WpaCliResult(
 				success=False,
 				error=f'Error running wpa_cli command: {err}',
 			)
+
+		if 'FAIL' in result:
+			debug(f'wpa_cli returned FAIL: {result}')
+			return WpaCliResult(
+				success=False,
+				error=f'wpa_cli returned a failure: {result}',
+			)
+
+		return WpaCliResult(success=True, response=result)
 
 	def _find_network_id(self, ssid: str, iface: str) -> int | None:
 		result = self._wpa_cli('list_networks', iface)
@@ -253,28 +245,25 @@ class WifiHandler:
 			debug('No password provided, aborting connection')
 			return None
 
-		return result.value()
+		return result.get_value()
 
 	def _get_scan_results(self, iface: str) -> list[WifiNetwork]:
 		debug(f'Retrieving scan results: {iface}')
 
 		try:
 			result = self._wpa_cli('scan_results', iface)
-
-			if not result.success:
-				debug(f'Failed to retrieve scan results: {result.error}')
-				return []
-
-			if not result.response:
-				debug('No wifi networks found')
-				return []
-
-			networks = WifiNetwork.from_wpa(result.response)
-
-			return networks
 		except SysCallError as err:
 			debug('Unable to retrieve wifi results')
 			raise err
 
+		if not result.success:
+			debug(f'Failed to retrieve scan results: {result.error}')
+			return []
 
-wifi_handler = WifiHandler()
+		if not result.response:
+			debug('No wifi networks found')
+			return []
+
+		networks = WifiNetwork.from_wpa(result.response)
+
+		return networks

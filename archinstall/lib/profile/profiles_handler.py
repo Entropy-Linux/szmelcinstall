@@ -1,31 +1,27 @@
-from __future__ import annotations
-
 import importlib.util
 import inspect
 import sys
 from collections import Counter
-from functools import cached_property
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from types import ModuleType
 from typing import TYPE_CHECKING, NotRequired, TypedDict
 
+from archinstall.default_profiles.profile import CustomSetting, GreeterType, Profile
+from archinstall.lib.hardware import GfxDriver, GfxPackage
+from archinstall.lib.log import debug, error, info
+from archinstall.lib.models.profile import ProfileConfiguration
+from archinstall.lib.networking import fetch_data_from_url
 from archinstall.lib.translationhandler import tr
 
-from ...default_profiles.profile import GreeterType, Profile
-from ..hardware import GfxDriver
-from ..models.profile import ProfileConfiguration
-from ..networking import fetch_data_from_url, list_interfaces
-from ..output import debug, error, info
-
 if TYPE_CHECKING:
-	from ..installer import Installer
+	from archinstall.lib.installer import Installer
 
 
 class ProfileSerialization(TypedDict):
 	main: NotRequired[str]
 	details: NotRequired[list[str]]
-	custom_settings: NotRequired[dict[str, dict[str, str | None]]]
+	custom_settings: NotRequired[dict[str, dict[CustomSetting, str | None]]]
 	path: NotRequired[str]
 
 
@@ -77,29 +73,6 @@ class ProfileHandler:
 			else:
 				self._import_profile_from_url(url_path)
 
-		# if custom := profile_config.get('custom', None):
-		# 	from archinstall.default_profiles.custom import CustomTypeProfile
-		# 	custom_types = []
-		#
-		# 	for entry in custom:
-		# 		custom_types.append(
-		# 			CustomTypeProfile(
-		# 				entry['name'],
-		# 				entry['enabled'],
-		# 				entry.get('packages', []),
-		# 				entry.get('services', [])
-		# 			)
-		# 		)
-		#
-		# 	self.remove_custom_profiles(custom_types)
-		# 	self.add_custom_profiles(custom_types)
-		#
-		# 	# this doesn't mean it's actual going to be set as a selection
-		# 	# but we are simply populating the custom profile with all
-		# 	# possible custom definitions
-		# 	if custom_profile := self.get_profile_by_name('Custom'):
-		# 		custom_profile.set_current_selection(custom_types)
-
 		if main := profile_config.get('main', None):
 			profile = self.get_profile_by_name(main) if main else None
 
@@ -113,7 +86,7 @@ class ProfileHandler:
 		if details:
 			for detail in filter(None, details):
 				# [2024-04-19] TODO: Backwards compatibility after naming change: https://github.com/archlinux/archinstall/pull/2421
-				#                    'Kde' is deprecated, remove this block in a future version
+				# 'Kde' is deprecated, remove this block in a future version
 				if detail == 'Kde':
 					detail = 'KDE Plasma'
 
@@ -142,10 +115,6 @@ class ProfileHandler:
 		"""
 		self._profiles = self._profiles or self._find_available_profiles()
 		return self._profiles
-
-	@cached_property
-	def _local_mac_addresses(self) -> list[str]:
-		return list(list_interfaces())
 
 	def add_custom_profiles(self, profiles: Profile | list[Profile]) -> None:
 		if not isinstance(profiles, list):
@@ -178,13 +147,10 @@ class ProfileHandler:
 	def get_custom_profiles(self) -> list[Profile]:
 		return [p for p in self.profiles if p.is_custom_type_profile()]
 
-	def get_mac_addr_profiles(self) -> list[Profile]:
-		tailored = [p for p in self.profiles if p.is_tailored()]
-		return [t for t in tailored if t.name in self._local_mac_addresses]
-
-	def install_greeter(self, install_session: 'Installer', greeter: GreeterType) -> None:
+	def install_greeter(self, install_session: Installer, greeter: GreeterType) -> None:
 		packages = []
 		service = None
+		service_disable = None
 
 		match greeter:
 			case GreeterType.LightdmSlick:
@@ -201,14 +167,24 @@ class ProfileHandler:
 				service = ['gdm']
 			case GreeterType.Ly:
 				packages = ['ly']
-				service = ['ly']
+				service = ['ly@tty1']
+				service_disable = ['getty@tty1']
 			case GreeterType.CosmicSession:
 				packages = ['cosmic-greeter']
+				service = ['cosmic-greeter']
+			case GreeterType.PlasmaLoginManager:
+				packages = ['plasma-login-manager']
+				service = ['plasmalogin']
+			case GreeterType.GreetdDms:
+				packages = ['greetd']
+				service = ['greetd']
 
 		if packages:
 			install_session.add_additional_packages(packages)
 		if service:
 			install_session.enable_service(service)
+		if service_disable:
+			install_session.disable_service(service_disable)
 
 		# slick-greeter requires a config change
 		if greeter == GreeterType.LightdmSlick:
@@ -221,28 +197,57 @@ class ProfileHandler:
 			with open(path, 'w') as file:
 				file.write(filedata)
 
-	def install_gfx_driver(self, install_session: 'Installer', driver: GfxDriver) -> None:
-		debug(f'Installing GFX driver: {driver.value}')
+		if greeter == GreeterType.GreetdDms:
+			greetd_config = install_session.target / 'etc/greetd/config.toml'
+			greetd_config.parent.mkdir(parents=True, exist_ok=True)
+			greetd_config.write_text(
+				'[terminal]\n'
+				'vt = 1\n'
+				'\n'
+				'[default_session]\n'
+				'user = "greeter"\n'
+				'command = "/usr/share/quickshell/dms/Modules/Greetd/assets/dms-greeter --command niri -p /usr/share/quickshell/dms"\n',
+			)
 
-		if driver in [GfxDriver.NvidiaOpenKernel, GfxDriver.NvidiaProprietary]:
-			headers = [f'{kernel}-headers' for kernel in install_session.kernels]
-			# Fixes https://github.com/archlinux/archinstall/issues/585
-			install_session.add_additional_packages(headers)
+			tmpfiles = install_session.target / 'etc/tmpfiles.d/dms-greeter.conf'
+			tmpfiles.parent.mkdir(parents=True, exist_ok=True)
+			tmpfiles.write_text(
+				'#  Path                    Mode User    Group   Age Argument\n'
+				'd /var/cache/dms-greeter   0750 greeter greeter -\n'
+				'd /var/lib/greeter         0755 greeter greeter -\n',
+			)
+
+	def install_gfx_driver(self, install_session: Installer, driver: GfxDriver) -> None:
+		debug(f'Installing GFX driver: {driver.value}')
 
 		driver_pkgs = driver.gfx_packages()
 		pkg_names = [p.value for p in driver_pkgs]
+
+		# For Nvidia open kernel modules, use nvidia-open instead of nvidia-open-dkms
+		# when all selected kernels are mainline (no dkms needed). This avoids
+		# installing dkms + kernel headers and speeds up installation.
+		if driver == GfxDriver.NvidiaOpenKernel:
+			needs_dkms = any('-' in k for k in install_session.kernels)
+
+			if needs_dkms:
+				headers = [f'{kernel}-headers' for kernel in install_session.kernels]
+				install_session.add_additional_packages(headers)
+			else:
+				pkg_names = [GfxPackage.NvidiaOpen.value if p == GfxPackage.NvidiaOpenDkms.value else p for p in pkg_names]
+				pkg_names = [p for p in pkg_names if p != GfxPackage.Dkms.value]
+
 		install_session.add_additional_packages(pkg_names)
 
-	def install_profile_config(self, install_session: 'Installer', profile_config: ProfileConfiguration) -> None:
+	def install_profile_config(self, install_session: Installer, profile_config: ProfileConfiguration) -> None:
 		profile = profile_config.profile
 
 		if not profile:
 			return
 
-		profile.install(install_session)
-
 		if profile_config.gfx_driver and (profile.is_xorg_type_profile() or profile.is_desktop_profile()):
 			self.install_gfx_driver(install_session, profile_config.gfx_driver)
+
+		profile.install(install_session)
 
 		if profile_config.greeter:
 			self.install_greeter(install_session, profile_config.greeter)
@@ -253,18 +258,16 @@ class ProfileHandler:
 		"""
 		try:
 			data = fetch_data_from_url(url)
-			b_data = bytes(data, 'utf-8')
-
+		except ValueError:
+			err = tr('Unable to fetch profile from specified url: {}').format(url)
+			error(err)
+		else:
 			with NamedTemporaryFile(delete=False, suffix='.py') as fp:
-				fp.write(b_data)
+				fp.write(data)
 				filepath = Path(fp.name)
 
 			profiles = self._process_profile_file(filepath)
 			self.remove_custom_profiles(profiles)
-			self.add_custom_profiles(profiles)
-		except ValueError:
-			err = tr('Unable to fetch profile from specified url: {}').format(url)
-			error(err)
 
 	def _load_profile_class(self, module: ModuleType) -> list[Profile]:
 		"""
@@ -342,26 +345,25 @@ class ProfileHandler:
 		profiles_path = Path(__file__).parents[2] / 'default_profiles'
 		profiles = []
 		for file in profiles_path.glob('**/*.py'):
-			# ignore the abstract default_profiles class
-			if 'profile.py' in file.name:
+			# ignore the abstract base classes
+			if file.name == 'profile.py':
 				continue
 			profiles += self._process_profile_file(file)
 
 		for profile in list(profiles):
-			if hasattr(profile, '_variants'):
-				for variant in getattr(profile, '_variants', []):
-					if isinstance(variant, Profile):
-						profiles.append(variant)
+			for variant in getattr(profile, '_variants', []):
+				if isinstance(variant, Profile):
+					profiles.append(variant)
 
 		self._verify_unique_profile_names(profiles)
 		return profiles
 
-	def reset_top_level_profiles(self, exclude: list[Profile] = []) -> None:
+	def reset_top_level_profiles(self, exclude: list[Profile] | None = None) -> None:
 		"""
 		Reset all top level profile configurations, this is usually necessary
 		when a new top level profile is selected
 		"""
-		excluded_profiles = [p.name for p in exclude]
+		excluded_profiles = [p.name for p in exclude] if exclude is not None else []
 		for profile in self.get_top_level_profiles():
 			if profile.name not in excluded_profiles:
 				profile.reset()

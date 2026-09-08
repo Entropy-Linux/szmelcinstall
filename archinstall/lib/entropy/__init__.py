@@ -1,4 +1,5 @@
-from .catalog import (
+from archinstall.lib.entropy.apply import apply_payload
+from archinstall.lib.entropy.catalog import (
 	EntropyComponent,
 	EntropyPayload,
 	EntropySpec,
@@ -8,8 +9,7 @@ from .catalog import (
 	load_kits,
 	resolve_dependencies,
 )
-from .apply import apply_payload
-from .runtime import payload_from_config
+from archinstall.lib.entropy.runtime import payload_from_config
 
 __all__ = [
 	'EntropyComponent',

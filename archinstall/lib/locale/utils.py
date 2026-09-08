@@ -1,6 +1,10 @@
-from ..exceptions import ServiceException, SysCallError
-from ..general import SysCommand
-from ..output import error
+from functools import lru_cache
+from pathlib import Path
+
+from archinstall.lib.command import SysCommand
+from archinstall.lib.exceptions import ServiceException, SysCallError
+from archinstall.lib.log import error
+from archinstall.lib.utils.util import running_from_iso
 
 
 def list_keyboard_languages() -> list[str]:
@@ -23,6 +27,13 @@ def list_locales() -> list[str]:
 				locales.append(line.rstrip())
 
 	return locales
+
+
+@lru_cache
+def list_console_fonts() -> list[str]:
+	directory = Path('/usr/share/kbd/consolefonts')
+	fonts = {path.name.split('.')[0] for path in directory.glob('*.gz')}
+	return sorted(fonts)
 
 
 def list_x11_keyboard_languages() -> list[str]:
@@ -79,6 +90,11 @@ def get_kb_layout() -> str:
 
 
 def set_kb_layout(locale: str) -> bool:
+	if not running_from_iso():
+		# Skip when running from host - no need to change host keymap
+		# The target installation keymap is set via installer.set_keyboard_language()
+		return True
+
 	if len(locale.strip()):
 		if not verify_keyboard_layout(locale):
 			error(f'Invalid keyboard locale specified: {locale}')

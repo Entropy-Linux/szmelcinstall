@@ -53,6 +53,9 @@ msgstr ""
 msgid "Only packages such as base, base-devel, linux, linux-firmware, efibootmgr and optional profile packages are installed."
 msgstr ""
 
+msgid "Note: base-devel is no longer installed by default. Add it here if you need build tools."
+msgstr ""
+
 msgid "If you desire a web browser, such as firefox or chromium, you may specify it in the following prompt."
 msgstr ""
 
@@ -769,6 +772,19 @@ msgid "Invalid input! Try again with a valid input [1 to {max_downloads}, or 0 t
 msgstr ""
 
 msgid "Parallel Downloads"
+msgstr ""
+
+msgid "Pacman"
+msgstr ""
+
+msgid "Color"
+msgstr ""
+
+#, python-brace-format
+msgid "Enter the number of parallel downloads (1-{})"
+msgstr ""
+
+msgid "Enable colored output for pacman"
 msgstr ""
 
 msgid "ESC to skip"
@@ -1595,6 +1611,123 @@ msgstr ""
 msgid "Exit search mode"
 msgstr ""
 
+msgid "General"
+msgstr ""
+
+msgid "Navigation"
+msgstr ""
+
+msgid "Selection"
+msgstr ""
+
+msgid "Search"
+msgstr ""
+
+msgid "Down"
+msgstr ""
+
+msgid "Up"
+msgstr ""
+
+msgid "Confirm"
+msgstr ""
+
+msgid "Focus right"
+msgstr ""
+
+msgid "Focus left"
+msgstr ""
+
+msgid "Toggle"
+msgstr ""
+
+msgid "Show/Hide help"
+msgstr ""
+
+msgid "Quit"
+msgstr ""
+
+msgid "First"
+msgstr ""
+
+msgid "Last"
+msgstr ""
+
+msgid "Select"
+msgstr ""
+
+msgid "Page Up"
+msgstr ""
+
+msgid "Page Down"
+msgstr ""
+
+msgid "Page up"
+msgstr ""
+
+msgid "Page down"
+msgstr ""
+
+msgid "Page Left"
+msgstr ""
+
+msgid "Page Right"
+msgstr ""
+
+msgid "Cursor up"
+msgstr ""
+
+msgid "Cursor down"
+msgstr ""
+
+msgid "Cursor right"
+msgstr ""
+
+msgid "Cursor left"
+msgstr ""
+
+msgid "Top"
+msgstr ""
+
+msgid "Bottom"
+msgstr ""
+
+msgid "Home"
+msgstr ""
+
+msgid "End"
+msgstr ""
+
+msgid "Toggle option"
+msgstr ""
+
+msgid "Scroll Up"
+msgstr ""
+
+msgid "Scroll Down"
+msgstr ""
+
+msgid "Scroll Left"
+msgstr ""
+
+msgid "Scroll Right"
+msgstr ""
+
+msgid "Scroll Home"
+msgstr ""
+
+msgid "Scroll End"
+msgstr ""
+
+msgid "Focus Next"
+msgstr ""
+
+msgid "Focus Previous"
+msgstr ""
+
+msgid "Copy selected text"
+msgstr ""
+
 msgid "labwc needs access to your seat (collection of hardware devices i.e. keyboard, mouse, etc)"
 msgstr ""
 
@@ -1664,6 +1797,15 @@ msgid "Bluetooth"
 msgstr ""
 
 msgid "Would you like to configure Bluetooth?"
+msgstr ""
+
+msgid "Print service"
+msgstr ""
+
+msgid "Would you like to configure the print service?"
+msgstr ""
+
+msgid "Power management"
 msgstr ""
 
 msgid "Authentication"
@@ -1769,4 +1911,217 @@ msgid "Systems where you want the disk to be bootable on any computer."
 msgstr ""
 
 msgid "Firmware that does not properly support NVRAM boot entries."
+msgstr ""
+
+msgid "Will install to /EFI/BOOT/ (removable location, safe default)"
+msgstr ""
+
+msgid "Will install to custom location with NVRAM entry"
+msgstr ""
+
+msgid "Firmware that does not properly support NVRAM boot entries like most MSI motherboards,"
+msgstr ""
+
+msgid "most Apple Macs, many laptops..."
+msgstr ""
+
+msgid "Language"
+msgstr ""
+
+msgid "Compression algorithm"
+msgstr ""
+
+msgid "Only packages such as base, sudo, linux, linux-firmware, efibootmgr and optional profile packages are installed."
+msgstr ""
+
+msgid "Select zram compression algorithm:"
+msgstr ""
+
+msgid "Use Network Manager (default backend)"
+msgstr ""
+
+msgid "Use Network Manager (iwd backend)"
+msgstr ""
+
+msgid "Firewall"
+msgstr ""
+
+msgid "Additional fonts"
+msgstr ""
+
+msgid "Select font packages to install"
+msgstr ""
+
+msgid "Unicode font coverage for most languages"
+msgstr ""
+
+msgid "color emoji for browsers and apps"
+msgstr ""
+
+msgid "Chinese, Japanese, Korean characters"
+msgstr ""
+
+msgid "Select audio configuration"
+msgstr ""
+
+msgid "Enter credentials file decryption password"
+msgstr ""
+
+msgid "Enter root password"
+msgstr ""
+
+msgid "Select bootloader to install"
+msgstr ""
+
+msgid "Configuration preview"
+msgstr ""
+
+msgid "Enter a directory for the configuration(s) to be saved"
+msgstr ""
+
+msgid "Select encryption type"
+msgstr ""
+
+msgid "Select disks for the installation"
+msgstr ""
+
+msgid "Enter a mountpoint"
+msgstr ""
+
+#, python-brace-format
+msgid "Enter a size (default: {}): "
+msgstr ""
+
+msgid "Enter subvolume name"
+msgstr ""
+
+msgid "Enter subvolume mountpoint"
+msgstr ""
+
+msgid "Select a disk configuration"
+msgstr ""
+
+msgid "Enter root mount directory"
+msgstr ""
+
+msgid "You will use whatever drive-setup is mounted at the specified directory"
+msgstr ""
+
+msgid "WARNING: Archinstall won't check the suitability of this setup"
+msgstr ""
+
+msgid "Select main filesystem"
+msgstr ""
+
+msgid "Enter a hostname"
+msgstr ""
+
+msgid "Select timezone"
+msgstr ""
+
+msgid "Enter the number of parallel downloads to be enabled"
+msgstr ""
+
+#, python-brace-format
+msgid "Value must be between 1 and {}"
+msgstr ""
+
+msgid "Select which kernel(s) to install"
+msgstr ""
+
+msgid "Enter a respository name"
+msgstr ""
+
+msgid "Enter the repository url"
+msgstr ""
+
+msgid "Enter server url"
+msgstr ""
+
+msgid "Select mirror regions to be enabled"
+msgstr ""
+
+msgid "Select optional repositories to be enabled"
+msgstr ""
+
+msgid "Select an interface"
+msgstr ""
+
+msgid "Choose network configuration"
+msgstr ""
+
+msgid "No packages found"
+msgstr ""
+
+msgid "Select which greeter to install"
+msgstr ""
+
+msgid "Select a profile type"
+msgstr ""
+
+msgid "Enter new password"
+msgstr ""
+
+msgid "Enter a username"
+msgstr ""
+
+msgid "Enter a password"
+msgstr ""
+
+msgid "The password did not match, please try again"
+msgstr ""
+
+msgid "Password strength: Weak"
+msgstr ""
+
+msgid "Password strength: Moderate"
+msgstr ""
+
+msgid "Password strength: Strong"
+msgstr ""
+
+msgid "The selected desktop profile requires a regular user to log in via the greeter"
+msgstr ""
+
+#, python-brace-format
+msgid "Environment type: {} {}"
+msgstr ""
+
+msgid "Input cannot be empty"
+msgstr ""
+
+msgid "Recommended"
+msgstr ""
+
+msgid "Package"
+msgstr ""
+
+msgid "Curated selection of KDE Plasma packages"
+msgstr ""
+
+msgid "Dependencies"
+msgstr ""
+
+msgid "Package group"
+msgstr ""
+
+msgid "Extensive KDE Plasma installation"
+msgstr ""
+
+msgid "Packages in group"
+msgstr ""
+
+msgid "Minimal KDE Plasma installation"
+msgstr ""
+
+msgid "Description"
+msgstr ""
+
+msgid "Select a flavor of KDE Plasma to install"
+msgstr ""
+
+msgid "Arial/Times/Courier replacement, Cyrillic support for Steam/games"
+msgstr ""
+
+msgid "wide Unicode coverage, good fallback font"
 msgstr ""

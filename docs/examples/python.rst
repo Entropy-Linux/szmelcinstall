@@ -29,7 +29,7 @@ We begin by creating "`scripts`_:code:`/test_installer.py`". The placement here 
 This script can now already be called using :code:`python -m archinstall --script test_installer` after a successful installation of the library itself.
 But the script won't do much. So we'll do something simple like list all the hard drives as an example.
 
-To do this, we'll begin by importing :code:`archinstall` in our "`scripts`_:code:`/test_installer.py`" and call a function whtin ``archinstall``.
+To do this, we'll begin by importing :code:`archinstall` in our "`scripts`_:code:`/test_installer.py`" and call a function within ``archinstall``.
 
 .. code-block:: python
 
@@ -64,8 +64,8 @@ After running ``python -m archinstall test_installer`` it should print something
                _PartitionInfo(
                    partition=<parted.partition.Partition object at 0x7fbe166c4a90>,
                    name='primary',
-                   type=<PartitionType.Primary: 'primary'>,
-                   fs_type=<FilesystemType.Fat32: 'fat32'>,
+                   type=<PartitionType.PRIMARY: 'primary'>,
+                   fs_type=<FilesystemType.FAT32: 'fat32'>,
                    path='/dev/nvme0n1p1',
                    start=Size(value=2048, unit=<Unit.sectors: 'sectors'>, sector_size=SectorSize(value=512, unit=<Unit.B: 1>)),
                    length=Size(value=535822336, unit=<Unit.B: 1>, sector_size=SectorSize(value=512, unit=<Unit.B: 1>)),

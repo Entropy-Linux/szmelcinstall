@@ -1,12 +1,16 @@
-from __future__ import annotations
-
 import builtins
 import gettext
 import json
 import os
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import override
+
+from archinstall.lib.command import SysCommand
+from archinstall.lib.exceptions import SysCallError
+from archinstall.lib.log import debug
+from archinstall.lib.utils.util import running_from_iso
 
 
 @dataclass
@@ -16,6 +20,7 @@ class Language:
 	translation: gettext.NullTranslations
 	translation_percent: int
 	translated_lang: str | None
+	console_font: str | None = None
 
 	@property
 	def display_name(self) -> str:
@@ -33,10 +38,19 @@ class Language:
 		return self.name_en
 
 
+_DEFAULT_FONT = 'default8x16'
+_ENV_FONT = os.environ.get('FONT')
+
+
 class TranslationHandler:
 	def __init__(self) -> None:
+		self._locales_dir = Path(__file__).parent.parent / 'locales'
 		self._base_pot = 'base.pot'
 		self._languages = 'languages.json'
+		self._active_language: Language | None = None
+		self._font_backup: Path | None = None
+		self._cmap_backup: Path | None = None
+		self._using_env_font: bool = False
 
 		self._total_messages = self._get_total_active_messages()
 		self._translated_languages = self._get_translations()
@@ -44,6 +58,66 @@ class TranslationHandler:
 	@property
 	def translated_languages(self) -> list[Language]:
 		return self._translated_languages
+
+	@property
+	def active_font(self) -> str | None:
+		if self._active_language is not None:
+			return self._active_language.console_font
+		return None
+
+	def _set_font(self, font_name: str | None) -> bool:
+		"""Set the console font via setfont. Only runs on ISO. Returns True on success."""
+		if not running_from_iso():
+			return False
+
+		target = font_name or _DEFAULT_FONT
+		try:
+			SysCommand(['setfont', target])
+			return True
+		except SysCallError as err:
+			debug(f'Failed to set console font {target}: {err}')
+			return False
+
+	def save_console_font(self) -> None:
+		"""Save the current console font (with unicode map) and console map to temp files."""
+		if not running_from_iso():
+			return
+
+		font_fd, font_path = tempfile.mkstemp(prefix='archinstall_font_')
+		cmap_fd, cmap_path = tempfile.mkstemp(prefix='archinstall_cmap_')
+		os.close(font_fd)
+		os.close(cmap_fd)
+		self._font_backup = Path(font_path)
+		self._cmap_backup = Path(cmap_path)
+
+		try:
+			SysCommand(['setfont', '-O', str(self._font_backup), '-om', str(self._cmap_backup)])
+		except SysCallError as err:
+			debug(f'Failed to save console font: {err}')
+			self._font_backup = None
+			self._cmap_backup = None
+
+	def restore_console_font(self) -> None:
+		"""Restore console font (with unicode map) and console map from backup."""
+		if not running_from_iso():
+			return
+
+		if self._font_backup is None or not self._font_backup.exists():
+			return
+
+		cmd = ['setfont', str(self._font_backup)]
+		if self._cmap_backup is not None and self._cmap_backup.exists():
+			cmd += ['-m', str(self._cmap_backup)]
+		try:
+			SysCommand(cmd)
+		except SysCallError as err:
+			debug(f'Failed to restore console font: {err}')
+
+		self._font_backup.unlink(missing_ok=True)
+		self._font_backup = None
+		if self._cmap_backup is not None:
+			self._cmap_backup.unlink(missing_ok=True)
+			self._cmap_backup = None
 
 	def _get_translations(self) -> list[Language]:
 		"""
@@ -55,28 +129,29 @@ class TranslationHandler:
 		languages = []
 
 		for short_form in defined_languages:
-			mapping_entry: dict[str, str] = next(filter(lambda x: x['abbr'] == short_form, mappings))
+			mapping_entry: dict[str, str] = next(x for x in mappings if x['abbr'] == short_form)
 			abbr = mapping_entry['abbr']
 			lang = mapping_entry['lang']
 			translated_lang = mapping_entry.get('translated_lang', None)
+			console_font = mapping_entry.get('console_font', None)
 
 			try:
 				# get a translation for a specific language
-				translation = gettext.translation('base', localedir=self._get_locales_dir(), languages=(abbr, lang))
-
-				# calculate the percentage of total translated text to total number of messages
-				if abbr == 'en':
-					percent = 100
-				else:
-					num_translations = self._get_catalog_size(translation)
-					percent = int((num_translations / self._total_messages) * 100)
-					# prevent cases where the .pot file is out of date and the percentage is above 100
-					percent = min(100, percent)
-
-				language = Language(abbr, lang, translation, percent, translated_lang)
-				languages.append(language)
+				translation = gettext.translation('base', localedir=self._locales_dir, languages=(abbr, lang))
 			except FileNotFoundError as err:
 				raise FileNotFoundError(f"Could not locate language file for '{lang}': {err}")
+
+			# calculate the percentage of total translated text to total number of messages
+			if abbr == 'en':
+				percent = 100
+			else:
+				num_translations = self._get_catalog_size(translation)
+				percent = int((num_translations / self._total_messages) * 100)
+				# prevent cases where the .pot file is out of date and the percentage is above 100
+				percent = min(100, percent)
+
+			language = Language(abbr, lang, translation, percent, translated_lang, console_font)
+			languages.append(language)
 
 		return languages
 
@@ -84,10 +159,7 @@ class TranslationHandler:
 		"""
 		Load the mapping table of all known languages
 		"""
-		locales_dir = self._get_locales_dir()
-		languages = Path.joinpath(locales_dir, self._languages)
-
-		with open(languages) as fp:
+		with (self._locales_dir / self._languages).open() as fp:
 			return json.load(fp)
 
 	def _get_catalog_size(self, translation: gettext.NullTranslations) -> int:
@@ -104,8 +176,7 @@ class TranslationHandler:
 		"""
 		Get total messages that could be translated
 		"""
-		locales = self._get_locales_dir()
-		with open(f'{locales}/{self._base_pot}') as fp:
+		with (self._locales_dir / self._base_pot).open() as fp:
 			lines = fp.readlines()
 			msgid_lines = [line for line in lines if 'msgid' in line]
 
@@ -129,30 +200,46 @@ class TranslationHandler:
 		except Exception:
 			raise ValueError(f'No language with abbreviation "{abbr}" found')
 
-	def activate(self, language: Language) -> None:
+	def activate(self, language: Language, set_font: bool = True) -> None:
 		"""
 		Set the provided language as the current translation
 		"""
 		# The install() call has the side effect of assigning GNUTranslations.gettext to builtins._
 		language.translation.install()
+		self._active_language = language
 
-	def _get_locales_dir(self) -> Path:
+		if set_font and not self._using_env_font:
+			self._set_font(language.console_font)
+
+	def apply_console_font(self) -> None:
+		"""Apply console font from FONT env var or active language mapping.
+
+		If FONT env var is set and valid, use it and skip language mapping.
+		If FONT is set but invalid, fall back to language font.
+		If FONT is not set, use active language font.
 		"""
-		Get the locales directory path
-		"""
-		cur_path = Path(__file__).parent.parent
-		locales_dir = Path.joinpath(cur_path, 'locales')
-		return locales_dir
+		if not running_from_iso():
+			return
+
+		if _ENV_FONT:
+			if self._set_font(_ENV_FONT):
+				self._using_env_font = True
+				debug(f'Console font set from FONT env var: {_ENV_FONT}')
+			else:
+				debug(f'FONT={_ENV_FONT} could not be set, falling back to language font mapping')
+				if self.active_font:
+					self._set_font(self.active_font)
+					debug(f'Console font set from language mapping: {self.active_font}')
+		elif self.active_font:
+			self._set_font(self.active_font)
+			debug(f'Console font set from language mapping: {self.active_font}')
 
 	def _provided_translations(self) -> list[str]:
 		"""
 		Get a list of all known languages
 		"""
-		locales_dir = self._get_locales_dir()
-		filenames = os.listdir(locales_dir)
-
 		translation_files = []
-		for filename in filenames:
+		for filename in os.listdir(self._locales_dir):
 			if len(filename) == 2 or filename in ['pt_BR', 'zh-CN', 'zh-TW']:
 				translation_files.append(filename)
 
@@ -175,6 +262,15 @@ class _DeferredTranslation:
 
 def tr(message: str) -> str:
 	return str(_DeferredTranslation(message))
+
+
+def tr_noop(message: str) -> str:
+	"""Mark a string for xgettext extraction without translating it here.
+
+	Use for strings that are translated later from a variable, e.g.
+	binding descriptions passed through tr() at runtime.
+	"""
+	return message
 
 
 builtins._ = _DeferredTranslation  # type: ignore[attr-defined]

@@ -46,6 +46,59 @@
                 "type": "string"
             }
         },
+        "install_from_iso": {
+            "description": "Copy configuration (and optionally the cache) from the live ISO session",
+            "type": "boolean"
+        },
+        "install_from_iso_mode": {
+            "description": "Which install-from-ISO payload to copy",
+            "type": "string",
+            "enum": ["configs", "configs_cache"]
+        },
+        "custom_script": {
+            "description": "Run the per-stage commands from archinstall/custom.sh",
+            "type": "boolean"
+        },
+        "szmelc_aur": {
+            "description": "Add the Szmelc custom repository (packages.szmelc.com)",
+            "type": "boolean"
+        },
+        "install_yay": {
+            "description": "Install yay from the Chaotic AUR repository",
+            "type": "boolean"
+        },
+        "chaotic_aur": {
+            "description": "Set up the Chaotic AUR repository on the target system",
+            "type": "boolean"
+        },
+        "entropy_kits": {
+            "description": "Entropy kit ids to apply, from archinstall/config/entropy/kits",
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "entropy_config_packs": {
+            "description": "Szmelc config pack ids to apply, from archinstall/config/entropy/configs",
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "entropy_asset_packs": {
+            "description": "Szmelc asset pack ids to apply, from archinstall/config/entropy/assets",
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "entropy_szmelc_packages": {
+            "description": "Packages to install from the Szmelc repository",
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
         "harddrives": {
             "description": "Path of device to be used",
             "type": "array",
